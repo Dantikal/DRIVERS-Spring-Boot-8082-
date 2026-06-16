@@ -1,0 +1,81 @@
+driver_auth
+├── id            UUID PK
+├── driver_id     UUID FK → drivers UNIQUE
+├── phone         VARCHAR(20) UNIQUE
+├── password      VARCHAR(255)        # BCrypt hash
+├── last_login    TIMESTAMP
+├── created_at    TIMESTAMP
+└── updated_at    TIMESTAMP
+
+drivers
+├── id            UUID PK
+├── full_name     VARCHAR(255)
+├── car_number    VARCHAR(50)
+├── phone         VARCHAR(20)
+├── warehouse_id  UUID               # к какому складу привязан
+├── status        ENUM: active/inactive
+├── created_at    TIMESTAMP
+└── updated_at    TIMESTAMP
+
+driver_debts
+├── id            UUID PK
+├── driver_id     UUID FK → drivers UNIQUE
+├── total_debt    DECIMAL(14,2) DEFAULT 0
+└── updated_at    TIMESTAMP
+
+driver_orders
+├── id            UUID PK
+├── driver_id     UUID FK → drivers
+├── warehouse_id  UUID
+├── status        ENUM: new/confirmed/modified
+│                       /rejected/dispatched
+├── requested_at  TIMESTAMP
+├── total_amount  DECIMAL(12,2)
+├── comment       TEXT
+└── created_at    TIMESTAMP
+
+driver_order_items
+├── id            UUID PK
+├── order_id      UUID FK → driver_orders
+├── product_id    UUID
+├── requested_qty INTEGER
+├── approved_qty  INTEGER
+└── created_at    TIMESTAMP
+
+driver_payments
+├── id             UUID PK
+├── driver_id      UUID FK → drivers
+├── amount         DECIMAL(12,2)
+├── payment_method ENUM: cash/transfer/card
+├── comment        TEXT
+├── received_by    UUID               # кто принял (зав. склада)
+├── paid_at        TIMESTAMP
+└── created_at     TIMESTAMP
+
+return_requests
+├── id            UUID PK
+├── driver_id     UUID FK → drivers
+├── returned_at   TIMESTAMP
+├── total_amount  DECIMAL(12,2)
+├── status        ENUM: pending/accepted/rejected
+└── created_at    TIMESTAMP
+
+return_items
+├── id            UUID PK
+├── return_id     UUID FK → return_requests
+├── product_id    UUID
+├── qty_boxes     INTEGER
+├── qty_pieces    INTEGER
+├── reason        ENUM: not_sold/melted/damaged/defect/other
+├── photo_url     VARCHAR(500)        # ссылка на фото
+└── created_at    TIMESTAMP
+
+offline_queue
+├── id                 UUID PK
+├── driver_id          UUID FK → drivers
+├── operation_type     VARCHAR(100)
+├── payload            JSONB
+├── created_offline_at TIMESTAMP
+├── status             ENUM: pending/sent/processed/failed
+├── retry_count        INTEGER DEFAULT 0
+└── created_at         TIMESTAMP

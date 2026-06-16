@@ -1,0 +1,32 @@
+spring:
+  profiles:
+    active: dev
+  application:
+    name: drivers-service
+
+  springdoc:
+    swagger-ui:
+      path: /swagger-ui.html
+      operationsSorter: alpha
+    api-docs:
+      path: /v3/api-docs
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/drivers_db}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:secret}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    properties:
+      hibernate:
+        format_sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+jwt:
+  secret: ${JWT_SECRET:g2S9x1nZb6VQ3p7tM8cJ5r2U1wY4l9NkQ0rTeHwXaEo}

@@ -1,0 +1,258 @@
+drivers-service/
+│
+├── src/
+│   ├── main/
+│   │   ├── java/com/drivers/
+│   │   │   │
+│   │   │   ├── DriversApplication.java
+│   │   │   │
+│   │   │   ├── config/
+│   │   │   │   ├── WebSocketConfig.java
+│   │   │   │   ├── SecurityConfig.java
+│   │   │   │   ├── RedisConfig.java
+│   │   │   │   └── DatabaseConfig.java            # drivers_db
+│   │   │   │
+│   │   │   ├── modules/
+│   │   │   │   │
+│   │   │   │   ├── auth/                          # Авторизация водителя
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── DriverAuthController.java
+│   │   │   │   │   │       # POST /api/drivers/auth/login
+│   │   │   │   │   │       # POST /api/drivers/auth/refresh
+│   │   │   │   │   │       # POST /api/drivers/auth/logout
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── DriverAuthService.java
+│   │   │   │   │   │       # login(phone, password)
+│   │   │   │   │   │       # → вернуть access + refresh JWT
+│   │   │   │   │   │       # refresh(refreshToken)
+│   │   │   │   │   │       # logout(token)
+│   │   │   │   │   │       # → добавить в Redis blacklist
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   │   └── DriverAuthRepository.java
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   │   └── DriverAuth.java
+│   │   │   │   │   │       # id, driver_id, phone
+│   │   │   │   │   │       # password (hashed), last_login
+│   │   │   │   │   └── dto/
+│   │   │   │   │       ├── LoginRequestDto.java
+│   │   │   │   │       └── LoginResponseDto.java
+│   │   │   │   │
+│   │   │   │   ├── drivers/                       # Справочник водителей
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── DriverController.java
+│   │   │   │   │   │       # GET  /api/drivers
+│   │   │   │   │   │       # POST /api/drivers
+│   │   │   │   │   │       # GET  /api/drivers/{id}
+│   │   │   │   │   │       # PUT  /api/drivers/{id}
+│   │   │   │   │   │       # GET  /api/drivers/{id}/debt
+│   │   │   │   │   │       # GET  /api/drivers/debts
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── DriverService.java
+│   │   │   │   │   │       # createDriver()
+│   │   │   │   │   │       # updateDriver()
+│   │   │   │   │   │       # getDriver()
+│   │   │   │   │   │       # getAllDrivers()
+│   │   │   │   │   │       # increaseDebt(driverId, amount)
+│   │   │   │   │   │       # decreaseDebt(driverId, amount)
+│   │   │   │   │   │       # getDebt(driverId)
+│   │   │   │   │   │       # getAllDebts()
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   │   ├── DriverRepository.java
+│   │   │   │   │   │   └── DriverDebtRepository.java
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   │   ├── Driver.java
+│   │   │   │   │   │   │   # id, full_name, car_number
+│   │   │   │   │   │   │   # phone, status, warehouse_id
+│   │   │   │   │   │   └── DriverDebt.java
+│   │   │   │   │   │       # id, driver_id, total_debt
+│   │   │   │   │   │       # updated_at
+│   │   │   │   │   └── dto/
+│   │   │   │   │       ├── DriverDto.java
+│   │   │   │   │       ├── DriverDebtDto.java
+│   │   │   │   │       └── DriverCreateDto.java
+│   │   │   │   │
+│   │   │   │   ├── orders/                        # Заявки водителей
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── OrderController.java
+│   │   │   │   │   │       # GET  /api/drivers/orders
+│   │   │   │   │   │       # POST /api/drivers/orders
+│   │   │   │   │   │       # GET  /api/drivers/orders/{id}
+│   │   │   │   │   │       # POST /api/drivers/orders/{id}/confirm
+│   │   │   │   │   │       # POST /api/drivers/orders/{id}/modify
+│   │   │   │   │   │       # POST /api/drivers/orders/{id}/reject
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── OrderService.java
+│   │   │   │   │   │       # createOrder(driverId, items[])
+│   │   │   │   │   │       # → статус: new
+│   │   │   │   │   │       # → publish ORDER_CREATED
+│   │   │   │   │   │       # confirmOrder(orderId)
+│   │   │   │   │   │       # → статус: confirmed
+│   │   │   │   │   │       # → publish ORDER_UPDATED
+│   │   │   │   │   │       # modifyOrder(orderId, items[])
+│   │   │   │   │   │       # → статус: modified
+│   │   │   │   │   │       # → publish ORDER_UPDATED
+│   │   │   │   │   │       # rejectOrder(orderId)
+│   │   │   │   │   │       # → статус: rejected
+│   │   │   │   │   │       # → publish ORDER_UPDATED
+│   │   │   │   │   │       # markDispatched(orderId)
+│   │   │   │   │   │       # → статус: dispatched
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   │   ├── DriverOrderRepository.java
+│   │   │   │   │   │   └── DriverOrderItemRepository.java
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   │   ├── DriverOrder.java
+│   │   │   │   │   │   │   # id, driver_id, warehouse_id
+│   │   │   │   │   │   │   # status, requested_at, total_amount
+│   │   │   │   │   │   │   # comment
+│   │   │   │   │   │   └── DriverOrderItem.java
+│   │   │   │   │   │       # id, order_id, product_id
+│   │   │   │   │   │       # requested_qty, approved_qty
+│   │   │   │   │   └── dto/
+│   │   │   │   │       ├── DriverOrderDto.java
+│   │   │   │   │       ├── DriverOrderItemDto.java
+│   │   │   │   │       └── OrderCreateDto.java
+│   │   │   │   │
+│   │   │   │   ├── payments/                      # Платежи водителей
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── DriverPaymentController.java
+│   │   │   │   │   │       # GET  /api/drivers/payments
+│   │   │   │   │   │       # POST /api/drivers/payments
+│   │   │   │   │   │       # GET  /api/drivers/payments/{id}
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── DriverPaymentService.java
+│   │   │   │   │   │       # receivePayment(driverId, amount,
+│   │   │   │   │   │       #                method, comment)
+│   │   │   │   │   │       # → decreaseDebt()
+│   │   │   │   │   │       # → publish PAYMENT_RECEIVED
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   │   └── DriverPaymentRepository.java
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   │   └── DriverPayment.java
+│   │   │   │   │   │       # id, driver_id, amount
+│   │   │   │   │   │       # payment_method, comment
+│   │   │   │   │   │       # received_by, paid_at
+│   │   │   │   │   └── dto/
+│   │   │   │   │       ├── DriverPaymentDto.java
+│   │   │   │   │       └── PaymentCreateDto.java
+│   │   │   │   │
+│   │   │   │   ├── returns/                       # Возвраты товара
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── ReturnController.java
+│   │   │   │   │   │       # GET  /api/drivers/returns
+│   │   │   │   │   │       # POST /api/drivers/returns
+│   │   │   │   │   │       # GET  /api/drivers/returns/{id}
+│   │   │   │   │   │       # POST /api/drivers/returns/upload-photo
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── ReturnService.java
+│   │   │   │   │   │       # processReturn(driverId, items[])
+│   │   │   │   │   │       # → decreaseDebt()
+│   │   │   │   │   │       # → publish RETURN_CREATED
+│   │   │   │   │   │       # uploadPhoto(file)
+│   │   │   │   │   │       # → сохранить файл
+│   │   │   │   │   │       # → вернуть photo_url
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   │   ├── ReturnRequestRepository.java
+│   │   │   │   │   │   └── ReturnItemRepository.java
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   │   ├── ReturnRequest.java
+│   │   │   │   │   │   │   # id, driver_id, returned_at
+│   │   │   │   │   │   │   # total_amount, status
+│   │   │   │   │   │   └── ReturnItem.java
+│   │   │   │   │   │       # id, return_id, product_id
+│   │   │   │   │   │       # qty_boxes, qty_pieces
+│   │   │   │   │   │       # reason, photo_url
+│   │   │   │   │   └── dto/
+│   │   │   │   │       ├── ReturnRequestDto.java
+│   │   │   │   │       ├── ReturnItemDto.java
+│   │   │   │   │       └── ReturnCreateDto.java
+│   │   │   │   │
+│   │   │   │   ├── confirmation/                  # Подтверждение получения
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── ConfirmationController.java
+│   │   │   │   │   │       # POST /api/drivers/dispatch/{id}/confirm
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── ConfirmationService.java
+│   │   │   │   │   │       # confirmReceipt(dispatchId, driverId)
+│   │   │   │   │   │       # → publish RECEIPT_CONFIRMED
+│   │   │   │   │   └── dto/
+│   │   │   │   │       └── ConfirmationDto.java
+│   │   │   │   │
+│   │   │   │   ├── offline/                       # Офлайн очередь
+│   │   │   │   │   ├── controller/
+│   │   │   │   │   │   └── OfflineController.java
+│   │   │   │   │   │       # POST /api/drivers/offline/sync
+│   │   │   │   │   ├── service/
+│   │   │   │   │   │   └── OfflineService.java
+│   │   │   │   │   │       # syncOfflineQueue(driverId,
+│   │   │   │   │   │       #                  operations[])
+│   │   │   │   │   │       # → обработать каждую операцию
+│   │   │   │   │   │       # → вернуть результат
+│   │   │   │   │   ├── repository/
+│   │   │   │   │   │   └── OfflineQueueRepository.java
+│   │   │   │   │   ├── entity/
+│   │   │   │   │   │   └── OfflineQueue.java
+│   │   │   │   │   │       # id, driver_id, operation_type
+│   │   │   │   │   │       # payload (JSONB), timestamp
+│   │   │   │   │   │       # status, retry_count
+│   │   │   │   │   └── dto/
+│   │   │   │   │       ├── OfflineSyncRequestDto.java
+│   │   │   │   │       └── OfflineSyncResponseDto.java
+│   │   │   │   │
+│   │   │   │   └── events/                        # Redis обработчики
+│   │   │   │       ├── listener/
+│   │   │   │       │   └── DispatchCreatedListener.java
+│   │   │   │       │       # warehouse → drivers
+│   │   │   │       │       # increaseDebt()
+│   │   │   │       │       # markDispatched()
+│   │   │   │       ├── publisher/
+│   │   │   │       │   └── DriverEventPublisher.java
+│   │   │   │       └── dto/
+│   │   │   │           ├── DriverPaymentEvent.java
+│   │   │   │           ├── DriverReturnEvent.java
+│   │   │   │           ├── DriverOrderEvent.java
+│   │   │   │           └── ReceiptConfirmedEvent.java
+│   │   │   │
+│   │   │   └── shared/
+│   │   │       ├── entity/
+│   │   │       │   └── BaseEntity.java
+│   │   │       ├── exception/
+│   │   │       │   ├── GlobalExceptionHandler.java
+│   │   │       │   ├── DriverNotFoundException.java
+│   │   │       │   ├── OrderNotFoundException.java
+│   │   │       │   └── InvalidCredentialsException.java
+│   │   │       ├── util/
+│   │   │       │   ├── JwtUtil.java
+│   │   │       │   ├── PasswordUtil.java          # BCrypt
+│   │   │       │   └── DateUtil.java
+│   │   │       └── interceptor/
+│   │   │           └── WsAuthInterceptor.java
+│   │   │
+│   │   └── resources/
+│   │       ├── application.yml
+│   │       ├── application-dev.yml
+│   │       └── application-prod.yml
+│   │
+│   └── test/
+│       └── java/com/drivers/
+│           ├── auth/
+│           │   └── DriverAuthServiceTest.java
+│           ├── drivers/
+│           │   ├── DriverServiceTest.java
+│           │   └── DriverControllerTest.java
+│           ├── orders/
+│           │   ├── OrderServiceTest.java
+│           │   └── OrderControllerTest.java
+│           ├── payments/
+│           │   └── DriverPaymentServiceTest.java
+│           ├── returns/
+│           │   └── ReturnServiceTest.java
+│           ├── confirmation/
+│           │   └── ConfirmationServiceTest.java
+│           ├── offline/
+│           │   └── OfflineServiceTest.java
+│           └── events/
+│               └── DispatchCreatedListenerTest.java
+│
+├── pom.xml
+├── Dockerfile
+└── .env.example

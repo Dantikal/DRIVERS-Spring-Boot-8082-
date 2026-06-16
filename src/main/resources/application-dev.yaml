@@ -1,0 +1,20 @@
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+
+  datasource:
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 2
+
+jwt:
+  expiration-time: 86400000 #24h
+  refresh-expiration-time: 2592000000 #30d
+
+logging:
+  level:
+    root: INFO
+    com.drivers: DEBUG
+    org.hibernate.SQL: DEBUG

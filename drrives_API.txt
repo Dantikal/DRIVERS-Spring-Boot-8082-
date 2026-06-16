@@ -1,0 +1,33 @@
+POST /api/drivers/auth/login
+POST /api/drivers/auth/refresh
+POST /api/drivers/auth/logout
+
+GET  /api/drivers
+POST /api/drivers
+GET  /api/drivers/{id}
+PUT  /api/drivers/{id}
+GET  /api/drivers/{id}/debt
+GET  /api/drivers/debts
+
+GET  /api/drivers/orders
+POST /api/drivers/orders
+GET  /api/drivers/orders/{id}
+POST /api/drivers/orders/{id}/confirm
+POST /api/drivers/orders/{id}/modify
+POST /api/drivers/orders/{id}/reject
+
+GET  /api/drivers/payments
+POST /api/drivers/payments
+GET  /api/drivers/payments/{id}
+
+GET  /api/drivers/returns
+POST /api/drivers/returns
+GET  /api/drivers/returns/{id}
+POST /api/drivers/returns/upload-photo
+
+POST /api/drivers/dispatch/{id}/confirm
+
+POST /api/drivers/offline/sync
+
+WS   /topic/orders/new
+WS   /topic/orders/updated

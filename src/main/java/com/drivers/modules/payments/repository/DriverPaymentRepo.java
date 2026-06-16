@@ -1,0 +1,11 @@
+package com.drivers.modules.payments.repository;
+
+import com.drivers.modules.payments.entity.DriverPayment;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.UUID;
+
+@Repository
+public interface DriverPaymentRepo extends JpaRepository<DriverPayment, UUID> {
+}
