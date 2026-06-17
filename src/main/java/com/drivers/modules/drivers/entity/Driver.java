@@ -17,10 +17,10 @@ public class Driver extends BaseEntity {
     @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
 
-    @Column(name = "car_number", nullable = false, length = 50)
+    @Column(name = "car_number", nullable = false,unique = true, length = 50)
     private String carNumber;
 
-    @Column(name = "phone", nullable = false, length = 20)
+    @Column(name = "phone", nullable = false, unique = true, length = 20)
     private String phone;
 
     @Column(name = "warehouse_id", nullable = false)
