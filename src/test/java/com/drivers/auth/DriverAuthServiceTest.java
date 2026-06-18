@@ -7,7 +7,7 @@ import com.drivers.modules.auth.repository.DriverAuthRepository;
 import com.drivers.modules.auth.service.impl.DriverAuthServiceImpl;
 import com.drivers.modules.drivers.entity.Driver;
 import com.drivers.modules.drivers.entity.DriverStatus;
-import com.drivers.modules.drivers.repository.DriverRepo;
+import com.drivers.modules.drivers.repository.DriverRepository;
 import com.drivers.shared.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -36,7 +36,7 @@ class DriverAuthServiceTest {
     @Mock
     private JwtUtil jwtUtil;
     @Mock
-    private DriverRepo driverRepo;
+    private DriverRepository driverRepository;
 
     @InjectMocks
     private DriverAuthServiceImpl driverAuthService;
@@ -75,7 +75,7 @@ class DriverAuthServiceTest {
     void login_Success_ShouldReturnLoginResponse() {
         when(authManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
         when(driverAuthRepo.findByPhone(any(String.class))).thenReturn(Optional.of(driverAuth));
-        when(driverRepo.findById(any(UUID.class))).thenReturn(Optional.of(driver));
+        when(driverRepository.findById(any(UUID.class))).thenReturn(Optional.of(driver));
         when(jwtUtil.generateToken(any(Authentication.class), any(UUID.class))).thenReturn("access_token");
         when(jwtUtil.generateRefreshToken(any(Authentication.class))).thenReturn("refresh_token");
 
@@ -92,6 +92,6 @@ class DriverAuthServiceTest {
 
         verify(authManager, times(1)).authenticate(any(UsernamePasswordAuthenticationToken.class));
         verify(driverAuthRepo, times(1)).findByPhone(phone);
-        verify(driverRepo, times(1)).findById(driverId);
+        verify(driverRepository, times(1)).findById(driverId);
     }
 }

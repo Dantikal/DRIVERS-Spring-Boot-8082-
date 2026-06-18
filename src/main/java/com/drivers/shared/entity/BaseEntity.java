@@ -6,7 +6,7 @@ import lombok.Setter;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Getter
@@ -19,9 +19,9 @@ public class BaseEntity {
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    public LocalDateTime createdAt;
+    public Instant createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    public LocalDateTime updatedAt;
+    public Instant updatedAt;
 }

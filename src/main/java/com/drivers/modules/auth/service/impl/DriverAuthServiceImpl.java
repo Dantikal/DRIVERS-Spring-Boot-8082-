@@ -10,7 +10,7 @@ import com.drivers.modules.auth.entity.DriverAuth;
 import com.drivers.modules.auth.repository.DriverAuthRepository;
 import com.drivers.modules.auth.service.DriverAuthService;
 import com.drivers.modules.drivers.entity.Driver;
-import com.drivers.modules.drivers.repository.DriverRepo;
+import com.drivers.modules.drivers.repository.DriverRepository;
 import com.drivers.shared.exception.DriverNotFoundException;
 import com.drivers.shared.exception.InvalidCredentialsException;
 import com.drivers.shared.util.CustomUserDetailsService;
@@ -25,6 +25,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -40,7 +41,7 @@ public class DriverAuthServiceImpl implements DriverAuthService {
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService customUserDetailsService;
     private final StringRedisTemplate redisTemplate;
-    private final DriverRepo driverRepo;
+    private final DriverRepository driverRepository;
 
     @Override
     @Transactional
@@ -57,6 +58,7 @@ public class DriverAuthServiceImpl implements DriverAuthService {
         DriverAuth driverAuth = driverAuthRepository.findByPhone(loginRequest.phone()).orElseThrow(() -> new DriverNotFoundException(
                 "Водитель с номером телефона: " + loginRequest.phone() + " не найден"
         ));
+        driverAuth.setLastLogin(Instant.now());
 
         log.info("Driver authenticated via phone: {}, system assigned ROLE_DRIVER", loginRequest.phone());
         return loginResponse(auth, driverAuth.getDriverId());
@@ -70,7 +72,7 @@ public class DriverAuthServiceImpl implements DriverAuthService {
 
     private LoginResponse loginResponse(Authentication auth, UUID driverId) {
         JwtTokens tokens = issueTokens(auth, driverId);
-        Driver driver = driverRepo.findById(driverId).orElseThrow(() -> new DriverNotFoundException(
+        Driver driver = driverRepository.findById(driverId).orElseThrow(() -> new DriverNotFoundException(
                 "Водитель с ID: " + driverId + " не найден"
         ));
 

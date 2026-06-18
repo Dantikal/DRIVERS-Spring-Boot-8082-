@@ -3,7 +3,8 @@ package com.drivers.modules.auth.entity;
 import com.drivers.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
-import java.time.LocalDateTime;
+
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -25,5 +26,5 @@ public class DriverAuth extends BaseEntity {
     private String password;
 
     @Column(name = "last_login")
-    private LocalDateTime lastLogin;
+    private Instant lastLogin;
 }
