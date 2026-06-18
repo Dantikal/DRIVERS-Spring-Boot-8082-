@@ -1,10 +1,16 @@
 package com.drivers.modules.auth.service.impl;
 
-import com.drivers.modules.auth.dto.LoginRequest;
-import com.drivers.modules.auth.dto.LoginResponse;
+import com.drivers.modules.auth.dto.*;
+import com.drivers.modules.auth.dto.req.LoginRequest;
+import com.drivers.modules.auth.dto.req.RefreshTokenRequest;
+import com.drivers.modules.auth.dto.res.LoginResponse;
+import com.drivers.modules.auth.dto.res.LogoutResponse;
+import com.drivers.modules.auth.dto.res.RefreshTokenResponse;
 import com.drivers.modules.auth.entity.DriverAuth;
-import com.drivers.modules.auth.repository.DriverAuthRepo;
+import com.drivers.modules.auth.repository.DriverAuthRepository;
 import com.drivers.modules.auth.service.DriverAuthService;
+import com.drivers.modules.drivers.entity.Driver;
+import com.drivers.modules.drivers.repository.DriverRepo;
 import com.drivers.shared.exception.DriverNotFoundException;
 import com.drivers.shared.exception.InvalidCredentialsException;
 import com.drivers.shared.util.CustomUserDetailsService;
@@ -23,15 +29,18 @@ import java.util.Date;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
+record JwtTokens(String accessToken, String refreshToken){}
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class DriverAuthServiceImpl implements DriverAuthService {
-    private final DriverAuthRepo driverAuthRepo;
+    private final DriverAuthRepository driverAuthRepository;
     private final AuthenticationManager authManager;
     private final JwtUtil jwtUtil;
     private final CustomUserDetailsService customUserDetailsService;
     private final StringRedisTemplate redisTemplate;
+    private final DriverRepo driverRepo;
 
     @Override
     @Transactional
@@ -39,74 +48,100 @@ public class DriverAuthServiceImpl implements DriverAuthService {
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(loginRequest.phone(), loginRequest.password());
         Authentication auth;
-        try{
-            auth = authManager.authenticate(
-                    authenticationToken);
-        } catch (Exception e){
-            throw new InvalidCredentialsException("Phone number or password is incorrect");
+        try {
+            auth = authManager.authenticate(authenticationToken);
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Номер телефона или пароль неверны");
         }
 
-        DriverAuth driverAuth = driverAuthRepo.findByPhone(loginRequest.phone()).orElseThrow(()->new DriverNotFoundException(
-                "Driver with phone: " + loginRequest.phone() + " not found"
+        DriverAuth driverAuth = driverAuthRepository.findByPhone(loginRequest.phone()).orElseThrow(() -> new DriverNotFoundException(
+                "Водитель с номером телефона: " + loginRequest.phone() + " не найден"
         ));
+
         log.info("Driver authenticated via phone: {}, system assigned ROLE_DRIVER", loginRequest.phone());
-        return issueTokens(auth, driverAuth.getDriverId());
+        return loginResponse(auth, driverAuth.getDriverId());
     }
 
-    private LoginResponse issueTokens(Authentication auth, UUID driverId) {
+    private JwtTokens issueTokens(Authentication auth, UUID driverId) {
         String access = jwtUtil.generateToken(auth, driverId);
         String refresh = jwtUtil.generateRefreshToken(auth);
+        return new JwtTokens(access, refresh);
+    }
 
-        return new LoginResponse(access,refresh);
+    private LoginResponse loginResponse(Authentication auth, UUID driverId) {
+        JwtTokens tokens = issueTokens(auth, driverId);
+        Driver driver = driverRepo.findById(driverId).orElseThrow(() -> new DriverNotFoundException(
+                "Водитель с ID: " + driverId + " не найден"
+        ));
+
+        User userData = User.builder()
+                .id(driver.getId())
+                .fullName(driver.getFullName())
+                .carNumber(driver.getCarNumber())
+                .warehouseId(driver.getWarehouseId())
+                .phone(driver.getPhone())
+                .status(driver.getStatus())
+                .build();
+
+        return LoginResponse.builder()
+                .accessToken(tokens.accessToken())
+                .refreshToken(tokens.refreshToken())
+                .user(userData)
+                .build();
     }
 
     @Override
     @Transactional
-    public LoginResponse refreshToken(String refreshToken) {
+    public RefreshTokenResponse refreshToken(RefreshTokenRequest req) {
         String phone;
+        String refreshToken = req.refreshToken();
         try {
-            phone = jwtUtil.extractUserName(refreshToken);
-        }catch (Exception e){
-            throw new InvalidCredentialsException("Invalid or expired refresh token");
+            phone = jwtUtil.extractUserName(req.refreshToken());
+        } catch (Exception e) {
+            throw new InvalidCredentialsException("Недействительный или истёкший токен обновления");
         }
 
-        DriverAuth driverAuth = driverAuthRepo.findByPhone(phone).orElseThrow(
-                ()->new DriverNotFoundException("Driver with phone: " + phone + " not found"));
+        DriverAuth driverAuth = driverAuthRepository.findByPhone(phone).orElseThrow(() -> new DriverNotFoundException(
+                "Водитель с номером телефона: " + phone + " не найден"
+        ));
         UserDetails userDetails = customUserDetailsService.loadUserByUsername(phone);
 
-        if(!jwtUtil.validateToken(refreshToken, userDetails)){
-            throw new InvalidCredentialsException("Invalid or expired refresh token");
+        if (!jwtUtil.validateToken(refreshToken, userDetails)) {
+            throw new InvalidCredentialsException("Недействительный или истёкший токен обновления");
         }
+
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(
                         userDetails,
                         null,
                         userDetails.getAuthorities());
 
-        return issueTokens(authenticationToken, driverAuth.getDriverId());
+        String access = jwtUtil.generateToken(authenticationToken, driverAuth.getDriverId());
+        return new RefreshTokenResponse(access);
     }
 
     @Override
-    public void logout(String token) {
-        if(token == null || token.isEmpty()){
-            return;
+    public LogoutResponse logout(RefreshTokenRequest req) {
+        String token = req.refreshToken();
+        if (token == null || token.isEmpty()) {
+            throw new InvalidCredentialsException("Токен обновления обязателен для выхода");
         }
         String cleanedToken = token.startsWith("Bearer ") ? token.substring(7) : token;
-        try{
+        try {
             Date expirationDate = jwtUtil.extractAllClaims(cleanedToken).getExpiration();
             long remainingTime = expirationDate.getTime() - System.currentTimeMillis();
 
-            if(remainingTime > 0){
+            if (remainingTime > 0) {
                 redisTemplate.opsForValue().set(
-                        "blacklist:" + jwtUtil.extractUserName(cleanedToken),
+                        "blacklist:" + cleanedToken,
                         "revoked",
                         remainingTime,
                         TimeUnit.MILLISECONDS);
             }
             log.info("Token successfully added to blacklist. Remaining time = {}ms", remainingTime);
-        }catch (Exception e){
+        } catch (Exception e) {
             log.warn("Failed to add token to blacklist: {}", e.getMessage());
-
         }
+        return new LogoutResponse("Выход выполнен");
     }
 }

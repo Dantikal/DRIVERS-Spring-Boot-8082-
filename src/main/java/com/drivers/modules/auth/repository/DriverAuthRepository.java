@@ -8,6 +8,6 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface DriverAuthRepo extends JpaRepository<DriverAuth, UUID> {
+public interface DriverAuthRepository extends JpaRepository<DriverAuth, UUID> {
     Optional<DriverAuth> findByPhone(String phone);
 }
