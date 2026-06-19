@@ -133,6 +133,18 @@ public class GlobalExceptionHandler {
                 .body(buildError("order_not_found", ex.getMessage(), null));
     }
 
+    @ExceptionHandler(PaymentNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handlePaymentNotFound(PaymentNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildError("payment_not_found", ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(ReturnNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleReturnNotFound(ReturnNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildError("return_not_found", ex.getMessage(), null));
+    }
+
     @ExceptionHandler(EntityNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
