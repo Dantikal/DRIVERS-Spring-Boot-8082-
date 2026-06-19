@@ -1,6 +1,7 @@
 package com.drivers.shared.exception;
 
 import com.drivers.config.TraceIdFilter;
+import com.drivers.shared.exception.ex.*;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.OptimisticLockException;
 import jakarta.persistence.PersistenceException;
@@ -123,7 +124,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DriverNotFoundException.class)
     public ResponseEntity<ErrorResponse> handleDriverNotFound(DriverNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(buildError("user_not_found", ex.getMessage(), null));
+                .body(buildError("driver_not_found", ex.getMessage(), null));
     }
 
     @ExceptionHandler(OrderNotFoundException.class)
@@ -136,6 +137,24 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleEntityNotFound(EntityNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
                 .body(buildError("entity_not_found", ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(PhoneAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handlePhoneAlreadyExists(PhoneAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildError("phone_already_exists", ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(CarNumberAlreadyExistsException.class)
+    public ResponseEntity<ErrorResponse> handleCarNumberAlreadyExists(CarNumberAlreadyExistsException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildError("car_number_already_exists", ex.getMessage(), null));
+    }
+
+    @ExceptionHandler(NegativeDebtException.class)
+    public ResponseEntity<ErrorResponse> handleNegativeDebt(NegativeDebtException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(buildError("negative_debt", ex.getMessage(), null));
     }
 
 

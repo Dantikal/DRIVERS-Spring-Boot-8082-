@@ -2,7 +2,7 @@ package com.drivers.shared.util;
 
 import com.drivers.modules.auth.entity.DriverAuth;
 import com.drivers.modules.auth.repository.DriverAuthRepository;
-import com.drivers.shared.exception.DriverNotFoundException;
+import com.drivers.shared.exception.ex.DriverNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;

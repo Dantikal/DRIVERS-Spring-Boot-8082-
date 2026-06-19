@@ -1,8 +1,11 @@
 package com.drivers.modules.drivers.dto.req;
 
 import jakarta.validation.constraints.*;
+import lombok.Builder;
+
 import java.util.UUID;
 
+@Builder
 public record DriverCreateReq(
         @NotBlank(message = "ФИО обязательно для заполнения")
         String fullName,

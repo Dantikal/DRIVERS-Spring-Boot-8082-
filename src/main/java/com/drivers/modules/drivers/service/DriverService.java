@@ -4,6 +4,7 @@ import com.drivers.modules.drivers.dto.req.DriverCreateReq;
 import com.drivers.modules.drivers.dto.DriverDebtDto;
 import com.drivers.modules.drivers.dto.DriverDto;
 import com.drivers.modules.drivers.dto.req.DriverUpdateReq;
+import com.drivers.modules.drivers.entity.DriverStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -14,10 +15,10 @@ public interface DriverService {
     DriverDto createDriver(DriverCreateReq driverCreateReq);
     DriverDto updateDriver(UUID id, DriverUpdateReq dto);
     DriverDto getDriver(UUID id);
-    Page<DriverDto> getAllDrivers(Pageable pageable);
+    Page<DriverDto> getAllDrivers(Pageable pageable, DriverStatus status, UUID warehouseId, String search);
     void increaseDebt(UUID driverId, BigDecimal amount);
     void decreaseDebt(UUID driverId, BigDecimal amount);
     DriverDebtDto getDriverDebt(UUID driverId);
-    Page<DriverDebtDto> getAllDebts(Pageable pageable);
+    Page<DriverDebtDto> getAllDebts(Pageable pageable, UUID warehouseId, BigDecimal minDebt);
 
 }

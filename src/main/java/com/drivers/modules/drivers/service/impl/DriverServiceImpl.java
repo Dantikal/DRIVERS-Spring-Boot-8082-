@@ -13,15 +13,18 @@ import com.drivers.modules.drivers.mapper.DriverDebtMapper;
 import com.drivers.modules.drivers.mapper.DriverMapper;
 import com.drivers.modules.drivers.repository.DriverDebtRepository;
 import com.drivers.modules.drivers.repository.DriverRepository;
+import com.drivers.modules.drivers.repository.specification.DriverSpecification;
 import com.drivers.modules.drivers.service.DriverService;
-import com.drivers.shared.exception.DriverNotFoundException;
+import com.drivers.shared.exception.ex.CarNumberAlreadyExistsException;
+import com.drivers.shared.exception.ex.DriverNotFoundException;
+import com.drivers.shared.exception.ex.NegativeDebtException;
+import com.drivers.shared.exception.ex.PhoneAlreadyExistsException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,9 +42,17 @@ public class DriverServiceImpl implements DriverService {
     private final DriverAuthRepository driverAuthRepository;
     private final DriverDebtRepository driverDebtRepository;
 
+    private final PasswordEncoder passwordEncoder;
+
     @Override
     @Transactional
     public DriverDto createDriver(DriverCreateReq driverCreateReq) {
+        if(driverRepository.existsByPhone(driverCreateReq.phone())){
+            throw new PhoneAlreadyExistsException("Номер телефона уже зарегистрирован");
+        }
+        if(driverRepository.existsByCarNumber(driverCreateReq.carNumber())){
+            throw new CarNumberAlreadyExistsException("Номер автомобиля уже зарегистрирован");
+        }
         Driver driverObject = Driver.builder()
                 .fullName(driverCreateReq.fullName())
                 .phone(driverCreateReq.phone())
@@ -52,7 +63,7 @@ public class DriverServiceImpl implements DriverService {
         Driver driver = driverRepository.save(driverObject);
         DriverAuth driverAuth = DriverAuth.builder()
                 .phone(driverCreateReq.phone())
-                .password(driverCreateReq.password())
+                .password(passwordEncoder.encode(driverCreateReq.password()))
                 .driverId(driver.getId())
                 .build();
         DriverDebt driverDebt = DriverDebt.builder()
@@ -71,15 +82,23 @@ public class DriverServiceImpl implements DriverService {
     @Transactional
     public DriverDto updateDriver(UUID id, DriverUpdateReq req) {
         Driver driver = getDriverById(id);
+        DriverDto res = updateDriverData(req, driver);
         log.info("Driver with id {} updated", id);
-        return updateDriverData(req, driver);
+        return res;
     }
     private DriverDto updateDriverData(DriverUpdateReq req, Driver driver){
+        if(driverRepository.existsByPhone(req.phone()) && !driver.getPhone().equals(req.phone())){
+            throw new PhoneAlreadyExistsException("Номер телефона уже зарегистрирован");
+        }
+        if(driverRepository.existsByCarNumber(req.carNumber()) && !driver.getCarNumber().equals(req.carNumber())){
+            throw new CarNumberAlreadyExistsException("Номер автомобиля уже используется другим водителем");
+        }
         driver.setFullName(req.fullName());
         driver.setPhone(req.phone());
-        driver.setStatus(req.status());
         driver.setCarNumber(req.carNumber());
         driver.setWarehouseId(req.warehouseId());
+        driver.setStatus(req.status());
+
         return driverMapper.toDto(driverRepository.save(driver));
     }
 
@@ -92,8 +111,16 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<DriverDto> getAllDrivers(Pageable pageable) {
-        return driverRepository.findAll(pageable).map(driverMapper::toDto);
+    public Page<DriverDto> getAllDrivers(Pageable pageable,
+                                         DriverStatus status,
+                                         UUID warehouseId,
+                                         String search) {
+        Specification<Driver> spec = DriverSpecification.hasStatus(status)
+                .and(DriverSpecification.hasWarehouseId(warehouseId))
+                .and(DriverSpecification.search(search));
+        log.info("Searching for drivers with status: {}, warehouseId: {}, search: {}", status, warehouseId, search);
+        Page<DriverDto> res =  driverRepository.findAll(spec, pageable).map(driverMapper::toDto);
+        return res;
     }
 
     @Override
@@ -109,6 +136,10 @@ public class DriverServiceImpl implements DriverService {
     @Transactional
     public void decreaseDebt(UUID driverId, BigDecimal amount) {
         DriverDebt driverDebt = getDriverDebtById(driverId);
+        BigDecimal newDebt = driverDebt.getTotalDebt().subtract(amount);
+        if(amount.compareTo(BigDecimal.ZERO) > 0 && newDebt.compareTo(BigDecimal.ZERO) < 0){
+            throw new NegativeDebtException("Долг не может быть негативным");
+        }
         driverDebt.setTotalDebt(driverDebt.getTotalDebt().subtract(amount));
         driverDebtRepository.save(driverDebt);
     }
@@ -116,21 +147,18 @@ public class DriverServiceImpl implements DriverService {
     @Override
     @Transactional(readOnly = true)
     public DriverDebtDto getDriverDebt(UUID driverId) {
-        if(!driverRepository.existsById(driverId)){
-            throw new DriverNotFoundException("Водитель с таким ID: " + driverId + " не найден");
-        }
-        return driverDebtMapper.toDto(getDriverDebtById(driverId));
+        Driver driver = getDriverById(driverId);
+
+        return driverDebtMapper.toDto(getDriverDebtById(driverId), driver.getFullName(), driver.getCarNumber());
     }
 
     @Override
     @Transactional(readOnly = true)
-    public Page<DriverDebtDto> getAllDebts(Pageable pageable) {
-        Pageable sortedByDesc = PageRequest.of(
-                pageable.getPageNumber(),
-                pageable.getPageSize(),
-                Sort.by(Sort.Direction.DESC, "totalDebt")
-        );
-        return driverDebtRepository.findAll(sortedByDesc).map(driverDebtMapper::toDto);
+    public Page<DriverDebtDto> getAllDebts(Pageable pageable,
+                                           UUID warehouseId,
+                                           BigDecimal minDebt) {
+
+        return driverDebtRepository.findAllDriverDebts(pageable, warehouseId, minDebt);
     }
 
     private Driver getDriverById(UUID id){
@@ -138,4 +166,5 @@ public class DriverServiceImpl implements DriverService {
     }
     private DriverDebt getDriverDebtById(UUID driverId) {
         return driverDebtRepository.findByDriverId(driverId).orElseThrow(()->new DriverNotFoundException("Водитель с таким ID: " + driverId + " не найден"));
-    }}
+    }
+}
