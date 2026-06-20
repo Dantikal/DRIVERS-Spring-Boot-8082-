@@ -1,6 +1,5 @@
 package com.drivers.modules.orders.service.impl;
 
-import com.drivers.modules.drivers.entity.Driver;
 import com.drivers.modules.drivers.service.DriverService;
 import com.drivers.modules.events.dto.DriverOrderEvent;
 import com.drivers.modules.orders.dto.OrderDto;
@@ -22,15 +21,10 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.math.BigDecimal;
-import java.security.Principal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -41,6 +35,9 @@ import java.util.UUID;
 @Slf4j
 public class OrderServiceImpl implements OrderService {
 
+    private static final String TOPIC_ORDERS_NEW     = "orders:new";
+    private static final String TOPIC_ORDERS_UPDATED = "orders:updated";
+
     private final DriverOrderRepo orderRepo;
     private final DriverService driverService;
     private final RedisTemplate<String, Object> redisTemplate;
@@ -48,17 +45,10 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public Page<OrderDto> getOrders(Pageable pageable, UUID driverId, OrderStatus status) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        boolean isDriver = auth.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_DRIVER"));
-        if (isDriver) {
-            driverId = driverService.getCurrentDriverId();
-        }
-
-        UUID finalDriverId = driverId;
         Specification<DriverOrder> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
-            if (finalDriverId != null) {
-                predicates.add(cb.equal(root.get("driverId"), finalDriverId));
+            if (driverId != null) {
+                predicates.add(cb.equal(root.get("driverId"), driverId));
             }
             if (status != null) {
                 predicates.add(cb.equal(root.get("status"), status));
@@ -70,11 +60,11 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderDto createOrder(OrderCreateReq req, UUID id) {
-        driverService.getDriver(id);
+    public OrderDto createOrder(OrderCreateReq req, UUID driverId) {
+        driverService.getDriver(driverId);
 
         DriverOrder order = DriverOrder.builder()
-                .driverId(id)
+                .driverId(driverId)
                 .warehouseId(req.warehouseId())
                 .status(OrderStatus.NEW)
                 .requestedAt(LocalDateTime.now())
@@ -86,8 +76,8 @@ public class OrderServiceImpl implements OrderService {
         req.items().forEach(itemReq -> order.getItems().add(toEntity(itemReq, order)));
 
         DriverOrder saved = orderRepo.save(order);
-        publishOrderEvent(saved, "ORDER_CREATED", "orders:new");
-        log.info("Успешно создана новая заявка {} для водителя {}", saved.getId(), saved.getDriverId());
+        publishOrderEvent(saved, "ORDER_CREATED", TOPIC_ORDERS_NEW);
+        log.info("Создана новая заявка {} для водителя {}", saved.getId(), saved.getDriverId());
         return toDto(saved);
     }
 
@@ -95,7 +85,7 @@ public class OrderServiceImpl implements OrderService {
     @Transactional(readOnly = true)
     public OrderDto getOrder(UUID id, UUID driverId) {
         DriverOrder order = getOrderById(id);
-        if(!order.getDriverId().equals(driverId)){
+        if (!order.getDriverId().equals(driverId)) {
             throw new AccessDeniedException("Вы не имеете доступа к данному заказу");
         }
         return toDto(order);
@@ -104,8 +94,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public OrderDto getOrder(UUID id) {
-        DriverOrder order = getOrderById(id);
-        return toDto(order);
+        return toDto(getOrderById(id));
     }
 
     @Override
@@ -118,18 +107,18 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(OrderStatus.CONFIRMED);
-
         order.getItems().forEach(item -> {
             if (item.getApprovedQty() == null) {
                 item.setApprovedQty(item.getRequestedQty());
             }
         });
 
+        DriverOrder saved = orderRepo.save(order);
         driverService.increaseDebt(order.getDriverId(), order.getTotalAmount());
 
-        DriverOrder saved = orderRepo.save(order);
-        publishOrderEvent(saved, "ORDER_UPDATED", "orders:updated");
-        log.info("Заведующий склада подтвердил выдачу накладной {}. Начислен долг водителю: {}", id, order.getTotalAmount());
+        publishOrderEvent(saved, "ORDER_UPDATED", TOPIC_ORDERS_UPDATED);
+        log.info("Зав. склада подтвердил выдачу заявки {}. Начислен долг водителю {}: {}",
+                id, order.getDriverId(), order.getTotalAmount());
         return toDto(saved);
     }
 
@@ -144,14 +133,12 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus(OrderStatus.MODIFIED);
         order.setComment(req.comment());
-
         order.setTotalAmount(req.totalAmount());
-
         updateOrderItems(order, req.items());
 
         DriverOrder saved = orderRepo.save(order);
-        publishOrderEvent(saved, "ORDER_UPDATED", "orders:updated");
-        log.info("Накладная {} успешно скорректирована заведующим склада", id);
+        publishOrderEvent(saved, "ORDER_UPDATED", TOPIC_ORDERS_UPDATED);
+        log.info("Накладная {} скорректирована зав. склада", id);
         return toDto(saved);
     }
 
@@ -170,22 +157,17 @@ public class OrderServiceImpl implements OrderService {
         }
 
         DriverOrder saved = orderRepo.save(order);
-        publishOrderEvent(saved, "ORDER_REJECTED", "orders:updated");
-        log.info("Заявка на товар {} отклонена складом", id);
+        publishOrderEvent(saved, "ORDER_REJECTED", TOPIC_ORDERS_UPDATED);
+        log.info("Заявка {} отклонена складом", id);
         return toDto(saved);
     }
 
     private DriverOrder getOrderById(UUID id) {
         return orderRepo.findById(id)
-                .orElseThrow(() -> new OrderNotFoundException("Накладная/Заказ с ID: " + id + " не найден в системе"));
+                .orElseThrow(() -> new OrderNotFoundException("Заказ с ID: " + id + " не найден"));
     }
 
-    /**
-     * Безопасное обновление позиций заказа без вызова деструктивного .clear()
-     */
     private void updateOrderItems(DriverOrder order, List<OrderItemReq> newItemsReq) {
-        // Для MVP-сценария пока оставляем замену через коллекцию JPA,
-        // но в будущем здесь должна быть синхронизация по productId
         order.getItems().clear();
         newItemsReq.forEach(req -> order.getItems().add(toEntity(req, order)));
     }
@@ -234,13 +216,12 @@ public class OrderServiceImpl implements OrderService {
                     .status(order.getStatus())
                     .totalAmount(order.getTotalAmount())
                     .eventType(eventType)
-                    .timestamp(java.time.LocalDateTime.now().toString())
+                    .timestamp(LocalDateTime.now().toString())
                     .build();
-
             redisTemplate.convertAndSend(topic, event);
-            log.info("Redis Pub/Sub: Event '{}' published to topic '{}' for order {}", eventType, topic, order.getId());
+            log.info("Redis event '{}' → topic '{}' for order {}", eventType, topic, order.getId());
         } catch (Exception e) {
-            log.error("Failed to publish order event to Redis Pub/Sub", e);
+            log.error("Не удалось опубликовать событие в Redis для заявки {}: {}", order.getId(), e.getMessage());
         }
     }
 }
