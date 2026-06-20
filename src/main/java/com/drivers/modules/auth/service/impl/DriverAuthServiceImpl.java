@@ -64,17 +64,19 @@ public class DriverAuthServiceImpl implements DriverAuthService {
         return loginResponse(auth, driverAuth.getDriverId());
     }
 
-    private JwtTokens issueTokens(Authentication auth, UUID driverId) {
-        String access = jwtUtil.generateToken(auth, driverId);
+    private JwtTokens issueTokens(Authentication auth, UUID driverId, UUID id) {
+        String access = jwtUtil.generateToken(auth, driverId, id);
         String refresh = jwtUtil.generateRefreshToken(auth);
         return new JwtTokens(access, refresh);
     }
 
     private LoginResponse loginResponse(Authentication auth, UUID driverId) {
-        JwtTokens tokens = issueTokens(auth, driverId);
         Driver driver = driverRepository.findById(driverId).orElseThrow(() -> new DriverNotFoundException(
                 "Водитель с ID: " + driverId + " не найден"
         ));
+
+        JwtTokens tokens = issueTokens(auth, driverId, driver.getId());
+
 
         User userData = User.builder()
                 .id(driver.getId())
@@ -118,7 +120,9 @@ public class DriverAuthServiceImpl implements DriverAuthService {
                         null,
                         userDetails.getAuthorities());
 
-        String access = jwtUtil.generateToken(authenticationToken, driverAuth.getDriverId());
+        UUID driverId = driverAuth.getDriverId();
+
+        String access = jwtUtil.generateToken(authenticationToken, driverAuth.getDriverId(), driverId);
         return new RefreshTokenResponse(access);
     }
 

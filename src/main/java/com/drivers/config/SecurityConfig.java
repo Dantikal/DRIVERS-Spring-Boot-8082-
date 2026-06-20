@@ -29,12 +29,13 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
-                                "/api/drivers/auth/login",
-                                "/api/drivers/auth/refresh",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        .requestMatchers("/api/drivers/auth/**").permitAll()
+                        .requestMatchers("/api/drivers/**").hasRole("DRIVER")
+                        .requestMatchers("/api/warehouse/**").hasRole("WAREHOUSE_MANAGER")
 
                         .anyRequest().authenticated()
                 )

@@ -93,7 +93,7 @@ class DriverAuthServiceTest {
         when(authManager.authenticate(any(UsernamePasswordAuthenticationToken.class))).thenReturn(authentication);
         when(driverAuthRepo.findByPhone(any(String.class))).thenReturn(Optional.of(driverAuth));
         when(driverRepository.findById(any(UUID.class))).thenReturn(Optional.of(driver));
-        when(jwtUtil.generateToken(any(Authentication.class), any(UUID.class))).thenReturn("access_token");
+        when(jwtUtil.generateToken(any(Authentication.class), any(UUID.class), any(UUID.class))).thenReturn("access_token");
         when(jwtUtil.generateRefreshToken(any(Authentication.class))).thenReturn("refresh_token");
 
         LoginRequest loginRequest = new LoginRequest(phone, "password");
@@ -121,7 +121,7 @@ class DriverAuthServiceTest {
         when(driverAuthRepo.findByPhone(any(String.class))).thenReturn(Optional.ofNullable(driverAuth));
         when(customUserDetailsService.loadUserByUsername(any(String.class))).thenReturn(userDetails);
         when(jwtUtil.validateToken(any(String.class), any(UserDetails.class))).thenReturn(true);
-        when(jwtUtil.generateToken(any(Authentication.class), any(UUID.class))).thenReturn("access_token");
+        when(jwtUtil.generateToken(any(Authentication.class), any(UUID.class), any(UUID.class))).thenReturn("access_token");
 
         RefreshTokenResponse res = driverAuthService.refreshToken(R);
 

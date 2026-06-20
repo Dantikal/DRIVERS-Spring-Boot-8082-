@@ -4,6 +4,7 @@ import com.drivers.shared.util.CustomUserDetailsService;
 import com.drivers.shared.util.JwtUtil;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -38,18 +39,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                                     FilterChain filterChain) throws ServletException, IOException {
         String authHeader = request.getHeader("Authorization");
         String token = null;
-        String username = null;
+        String phone = null;
 
         if (StringUtils.hasText(authHeader) && authHeader.startsWith("Bearer ")) {
             token = authHeader.substring(7);
 
             try {
                 if (StringUtils.hasText(token)) {
-                    username = jwtUtil.extractUserName(token);
+                    phone = jwtUtil.extractUserName(token);
                 }
 
-                if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(username);
+                if (phone != null && SecurityContextHolder.getContext().getAuthentication() == null) {
+                    UserDetails userDetails = customUserDetailsService.loadUserByUsername(phone);
 
                     if (jwtUtil.validateToken(token, userDetails)) {
                         UsernamePasswordAuthenticationToken authToken =
@@ -72,13 +73,20 @@ public class JwtAuthFilter extends OncePerRequestFilter {
                 }
 
             } catch (ExpiredJwtException ex) {
-                log.warn("The token is expired for user={} from IP={}", username, request.getRemoteAddr());
+                log.warn("The token is expired for user={} from IP={}", phone, request.getRemoteAddr());
                 response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
                 response.setContentType("application/json");
-                response.getWriter().write("{\"error\": \"JWT token expired\"}"); // Возвращаем JSON, а не голый текст
+                response.getWriter().write("{\"error\": \"JWT token expired\"}");
+                response.getWriter().flush();
+                return;
+            }catch (JwtException ex) {
+                log.warn("Invalid JWT from IP={}: {}", request.getRemoteAddr(), ex.getMessage());
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\": \"Invalid token\"}");
                 return;
             } catch (Exception ex) {
-                log.error("JWT authentication failed for user={} from IP={}: {}", username, request.getRemoteAddr(), ex.getMessage());
+                log.error("JWT authentication failed for user={} from IP={}: {}", phone, request.getRemoteAddr(), ex.getMessage());
             }
         }
         filterChain.doFilter(request, response);

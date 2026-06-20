@@ -11,9 +11,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -35,7 +33,7 @@ public class JwtUtil {
         this.jwtRefreshExpirationTime = jwtRefreshExpirationTime;
     }
 
-    public String generateToken(Authentication authentication, UUID driverId) {
+    public String generateToken(Authentication authentication, UUID driverId, UUID id) {
         String username = authentication.getName();
         List<String> roles = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
@@ -44,10 +42,13 @@ public class JwtUtil {
         Date now = new Date();
         Date expiry = new Date(now.getTime() + jwtExpirationTime);
 
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("driverId", driverId);
+        claims.put("roles", roles);
+
         return Jwts.builder()
                 .subject(username)
-                .claim("roles", roles)
-                .claim("driverId", driverId.toString())
+                .claims(claims)
                 .issuedAt(now)
                 .expiration(expiry)
                 .signWith(secretKey)
@@ -85,15 +86,9 @@ public class JwtUtil {
     }
 
     public boolean validateToken(String token, UserDetails userDetails) {
-        final String userName = extractUserName(token);
-        return (userName.equals(userDetails.getUsername()) && !isTokenExpired(token));
-    }
-
-    public boolean isTokenExpired(String token) {
-        return extractExpiration(token).before(new Date());
-    }
-
-    private Date extractExpiration(String token) {
-        return extractClaim(token, Claims::getExpiration);
+        Claims claims = extractAllClaims(token);
+        String userName = claims.getSubject();
+        boolean expired = claims.getExpiration().before(new Date());
+        return userName.equals(userDetails.getUsername()) && !expired;
     }
 }
