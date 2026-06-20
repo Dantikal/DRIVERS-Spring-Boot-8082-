@@ -24,11 +24,17 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -159,6 +165,15 @@ public class DriverServiceImpl implements DriverService {
                                            BigDecimal minDebt) {
 
         return driverDebtRepository.findAllDriverDebts(pageable, warehouseId, minDebt);
+    }
+
+    @Override
+    public UUID getCurrentDriverId() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs != null) {
+            return (UUID) attrs.getRequest().getAttribute("X-Current-Driver-Id");
+        }
+        return null;
     }
 
     private Driver getDriverById(UUID id){

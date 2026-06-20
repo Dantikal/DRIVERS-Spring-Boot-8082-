@@ -12,9 +12,6 @@ import java.util.UUID;
 
 @Builder
 public record OrderCreateReq(
-        @NotNull(message = "ID водителя обязателен")
-        UUID driverId,
-
         @NotNull(message = "ID склада обязателен")
         UUID warehouseId,
 

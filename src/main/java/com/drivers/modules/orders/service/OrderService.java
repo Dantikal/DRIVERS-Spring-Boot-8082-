@@ -12,7 +12,8 @@ import java.util.UUID;
 
 public interface OrderService {
     Page<OrderDto> getOrders(Pageable pageable, UUID driverId, OrderStatus status);
-    OrderDto createOrder(OrderCreateReq req);
+    OrderDto createOrder(OrderCreateReq req, UUID id);
+    OrderDto getOrder(UUID id, UUID driverId);
     OrderDto getOrder(UUID id);
     OrderDto confirmOrder(UUID id);
     OrderDto modifyOrder(UUID id, OrderModifyReq req);

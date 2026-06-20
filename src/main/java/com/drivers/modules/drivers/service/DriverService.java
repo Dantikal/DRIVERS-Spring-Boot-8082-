@@ -20,5 +20,5 @@ public interface DriverService {
     void decreaseDebt(UUID driverId, BigDecimal amount);
     DriverDebtDto getDriverDebt(UUID driverId);
     Page<DriverDebtDto> getAllDebts(Pageable pageable, UUID warehouseId, BigDecimal minDebt);
-
+    UUID getCurrentDriverId();
 }
