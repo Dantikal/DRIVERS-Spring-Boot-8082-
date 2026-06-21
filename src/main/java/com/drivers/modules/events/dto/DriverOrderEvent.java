@@ -2,6 +2,7 @@ package com.drivers.modules.events.dto;
 
 import com.drivers.modules.orders.entity.OrderStatus;
 import lombok.Builder;
+import lombok.Getter;
 
 import java.io.Serializable;
 import java.math.BigDecimal;
@@ -15,4 +16,4 @@ public record DriverOrderEvent(UUID orderId,
                                BigDecimal totalAmount,
                                String eventType,
                                String timestamp)
- implements Serializable {}
+        implements Serializable {}

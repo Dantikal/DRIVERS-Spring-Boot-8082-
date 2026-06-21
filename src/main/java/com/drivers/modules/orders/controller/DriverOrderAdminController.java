@@ -18,11 +18,11 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/warehouse/orders")
+@RequestMapping("/api/drivers/orders")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('WAREHOUSE_MANAGER')")
 @Tag(name = "Warehouse — Orders Management", description = "Панель управления накладными/заявками для завскладом")
-public class WarehouseOrderController {
+public class DriverOrderAdminController {
 
     private final OrderService orderService;
 
@@ -58,4 +58,11 @@ public class WarehouseOrderController {
     public OrderDto rejectOrder(@PathVariable UUID id, @RequestBody(required = false) OrderRejectReq req) {
         return orderService.rejectOrder(id, req);
     }
+
+    @PostMapping("/{id}/dispatch")
+    @Operation(summary = "Отметить заявку как отгруженную (передана водителю на маршрут)")
+    public OrderDto dispatchOrder(@PathVariable UUID id) {
+        return orderService.markDispatched(id);
+    }
+
 }

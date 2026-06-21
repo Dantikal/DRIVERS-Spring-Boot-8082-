@@ -21,11 +21,11 @@ import java.math.BigDecimal;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/warehouse/drivers")
+@RequestMapping("/api/drivers")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('WAREHOUSE_MANAGER')")
 @Tag(name = "Warehouse — Drivers", description = "Управление водителями для завскладом")
-public class WarehouseDriverController {
+public class DriverAdminController {
 
     private final DriverService driverService;
 

@@ -19,22 +19,22 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/drivers/orders")
+@RequestMapping("/api/drivers/me/orders")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('DRIVER')")
 @Tag(name = "Driver — Orders", description = "Управление заявками из мобильного приложения водителя")
-public class DriverOrderController {
+public class DriverOrderSelfController {
 
     private final OrderService orderService;
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @Operation(summary = "Создать новую заявку на товар (ID берется из JWT)")
+    @Operation(summary = "Создать новую заявку на товар ")
     public OrderDto createOrder(@Valid @RequestBody OrderCreateReq req, @CurrentDriverId UUID driverId) {
         return orderService.createOrder(req, driverId);
     }
 
-    @GetMapping
+    @GetMapping()
     @Operation(summary = "Получить список СВОИХ заявок с пагинацией и фильтром по статусу")
     public Page<OrderDto> getMyOrders(
             @PageableDefault(size = 20) Pageable pageable,

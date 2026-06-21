@@ -1,6 +1,6 @@
 package com.drivers.drivers;
 
-import com.drivers.modules.drivers.controller.WarehouseDriverController;
+import com.drivers.modules.drivers.controller.DriverAdminController;
 import com.drivers.modules.drivers.dto.DriverDto;
 import com.drivers.modules.drivers.dto.req.DriverCreateReq;
 import com.drivers.modules.drivers.entity.DriverStatus;
@@ -32,13 +32,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
-class WarehouseDriverControllerTest {
+class DriverAdminControllerTest {
 
     @Mock
     private DriverService driverService;
 
     @InjectMocks
-    private WarehouseDriverController warehouseDriverController;
+    private DriverAdminController driverAdminController;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -46,7 +46,7 @@ class WarehouseDriverControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(warehouseDriverController)
+                .standaloneSetup(driverAdminController)
                 .setCustomArgumentResolvers(
                         new PageableHandlerMethodArgumentResolver()
                 )
@@ -64,7 +64,7 @@ class WarehouseDriverControllerTest {
                 .warehouseId(null)
                 .build();
 
-        mockMvc.perform(post("/api/warehouse/drivers")
+        mockMvc.perform(post("/api/drivers")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest());
@@ -77,7 +77,7 @@ class WarehouseDriverControllerTest {
 
         when(driverService.getDriver(id)).thenReturn(dto);
 
-        mockMvc.perform(get("/api/warehouse/drivers/{driverId}", id))
+        mockMvc.perform(get("/api/drivers/{driverId}", id))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id.toString()));
     }
@@ -96,7 +96,7 @@ class WarehouseDriverControllerTest {
                 nullable(String.class)
         )).thenReturn(page);
 
-        mockMvc.perform(get("/api/warehouse/drivers")
+        mockMvc.perform(get("/api/drivers")
                         .param("page", "0")
                         .param("size", "20"))
                 .andExpect(status().isOk())

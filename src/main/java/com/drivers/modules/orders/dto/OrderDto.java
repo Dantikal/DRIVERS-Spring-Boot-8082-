@@ -15,7 +15,7 @@ public record OrderDto(
         UUID driverId,
         UUID warehouseId,
         OrderStatus status,
-        LocalDateTime requestedAt,
+        Instant requestedAt,
         BigDecimal totalAmount,
         String comment,
         List<OrderItemDto> items,

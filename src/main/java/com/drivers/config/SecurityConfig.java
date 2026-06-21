@@ -34,8 +34,6 @@ public class SecurityConfig {
                                 "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers("/api/drivers/auth/**").permitAll()
-                        .requestMatchers("/api/drivers/**").hasRole("DRIVER")
-                        .requestMatchers("/api/warehouse/**").hasRole("WAREHOUSE_MANAGER")
 
                         .anyRequest().authenticated()
                 )

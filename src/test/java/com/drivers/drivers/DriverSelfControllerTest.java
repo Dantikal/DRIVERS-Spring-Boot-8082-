@@ -1,9 +1,8 @@
 package com.drivers.drivers;
 
-import com.drivers.modules.drivers.controller.DriverController;
+import com.drivers.modules.drivers.controller.DriverSelfController;
 import com.drivers.modules.drivers.dto.DriverDebtDto;
 import com.drivers.modules.drivers.dto.DriverDto;
-import com.drivers.modules.drivers.dto.req.DriverCreateReq;
 import com.drivers.modules.drivers.dto.req.DriverUpdateReq;
 import com.drivers.modules.drivers.entity.DriverStatus;
 import com.drivers.modules.drivers.service.DriverService;
@@ -16,9 +15,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.core.MethodParameter;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableHandlerMethodArgumentResolver;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
@@ -29,9 +25,7 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.UUID;
-import java.util.List;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
@@ -41,13 +35,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 
 @ExtendWith(MockitoExtension.class)
-class DriverControllerTest {
+class DriverSelfControllerTest {
 
     @Mock
     private DriverService driverService;
 
     @InjectMocks
-    private DriverController driverController;
+    private DriverSelfController driverSelfController;
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
@@ -57,7 +51,7 @@ class DriverControllerTest {
     @BeforeEach
     void setUp() {
         mockMvc = MockMvcBuilders
-                .standaloneSetup(driverController)
+                .standaloneSetup(driverSelfController)
                 .setCustomArgumentResolvers(
                         new PageableHandlerMethodArgumentResolver(),
                         stubDriverIdResolver(DRIVER_ID)
@@ -129,4 +123,6 @@ class DriverControllerTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.fullName").value("Updated Name"));
     }
+
+
 }

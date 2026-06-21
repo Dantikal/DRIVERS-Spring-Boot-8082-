@@ -26,17 +26,17 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.time.ZoneOffset;
+import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class OrderServiceImpl implements OrderService {
 
-    private static final String TOPIC_ORDERS_NEW     = "orders:new";
-    private static final String TOPIC_ORDERS_UPDATED = "orders:updated";
+    private static final String TOPIC_ORDERS_NEW      = "orders:new";
+    private static final String TOPIC_ORDERS_UPDATED  = "orders:updated";
 
     private final DriverOrderRepo orderRepo;
     private final DriverService driverService;
@@ -114,6 +114,7 @@ public class OrderServiceImpl implements OrderService {
         });
 
         DriverOrder saved = orderRepo.save(order);
+        driverService.getDriver(order.getDriverId());
         driverService.increaseDebt(order.getDriverId(), order.getTotalAmount());
 
         publishOrderEvent(saved, "ORDER_UPDATED", TOPIC_ORDERS_UPDATED);
@@ -147,8 +148,8 @@ public class OrderServiceImpl implements OrderService {
     public OrderDto rejectOrder(UUID id, OrderRejectReq req) {
         DriverOrder order = getOrderById(id);
 
-        if (order.getStatus() == OrderStatus.CONFIRMED || order.getStatus() == OrderStatus.DISPATCHED) {
-            throw new IllegalStateException("Нельзя отклонить уже выданный водителю товар");
+        if (order.getStatus() != OrderStatus.NEW && order.getStatus() != OrderStatus.MODIFIED) {
+            throw new IllegalStateException("Нельзя отклонить заявку в статусе: " + order.getStatus());
         }
 
         order.setStatus(OrderStatus.REJECTED);
@@ -162,14 +163,49 @@ public class OrderServiceImpl implements OrderService {
         return toDto(saved);
     }
 
+    @Override
+    @Transactional
+    public OrderDto markDispatched(UUID id) {
+        DriverOrder order = getOrderById(id);
+
+        if (order.getStatus() != OrderStatus.CONFIRMED) {
+            throw new IllegalStateException("В доставку можно передать только подтвержденную заявку. Текущий статус: " + order.getStatus());
+        }
+
+        order.setStatus(OrderStatus.DISPATCHED);
+        DriverOrder saved = orderRepo.save(order);
+
+        publishOrderEvent(saved, "ORDER_DISPATCHED", TOPIC_ORDERS_UPDATED);
+        log.info("Заявка {} переведена в статус DISPATCHED (товар передан водителю)", id);
+
+        return toDto(saved);
+    }
+
     private DriverOrder getOrderById(UUID id) {
         return orderRepo.findById(id)
                 .orElseThrow(() -> new OrderNotFoundException("Заказ с ID: " + id + " не найден"));
     }
 
     private void updateOrderItems(DriverOrder order, List<OrderItemReq> newItemsReq) {
-        order.getItems().clear();
-        newItemsReq.forEach(req -> order.getItems().add(toEntity(req, order)));
+        Set<UUID> newProductIds = newItemsReq.stream()
+                .map(OrderItemReq::productId)
+                .collect(Collectors.toSet());
+
+        order.getItems().removeIf(item -> !newProductIds.contains(item.getProductId()));
+
+        for (OrderItemReq req : newItemsReq) {
+            DriverOrderItem existingItem = order.getItems().stream()
+                    .filter(item -> item.getProductId().equals(req.productId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existingItem != null) {
+                existingItem.setRequestedQty(req.requestedQty());
+                existingItem.setApprovedQty(req.approvedQty());
+            } else {
+                order.getItems().add(toEntity(req, order));
+            }
+        }
     }
 
     private DriverOrderItem toEntity(OrderItemReq req, DriverOrder order) {
@@ -187,7 +223,9 @@ public class OrderServiceImpl implements OrderService {
                 .driverId(order.getDriverId())
                 .warehouseId(order.getWarehouseId())
                 .status(order.getStatus())
-                .requestedAt(order.getRequestedAt())
+                .requestedAt(order.getRequestedAt() != null
+                        ? order.getRequestedAt().toInstant(ZoneOffset.UTC)
+                        : null)
                 .totalAmount(order.getTotalAmount())
                 .comment(order.getComment())
                 .items(order.getItems().stream().map(this::toItemDto).toList())

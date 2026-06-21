@@ -15,15 +15,15 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/drivers")
+@RequestMapping("/api/drivers/me")
 @RequiredArgsConstructor
 @PreAuthorize( "hasRole('DRIVER')")
 @Tag(name = "Driver", description = "Эндпоинты для самого водителя")
-public class DriverController {
+public class DriverSelfController {
 
     private final DriverService driverService;
 
-    @PutMapping("/me")
+    @PutMapping()
     @Operation(summary = "Обновить свои данные")
     public DriverDto updateDriver(
             @CurrentDriverId UUID driverId,
@@ -31,13 +31,13 @@ public class DriverController {
         return driverService.updateDriver(driverId, dto);
     }
 
-    @GetMapping("/me")
+    @GetMapping()
     @Operation(summary = "Получить свой профиль")
     public DriverDto getDriver(@CurrentDriverId UUID driverId) {
         return driverService.getDriver(driverId);
     }
 
-    @GetMapping("/me/debt")
+    @GetMapping("/debt")
     @Operation(summary = "Получить свой долг")
     public DriverDebtDto getDriverDebt(@CurrentDriverId UUID driverId) {
         return driverService.getDriverDebt(driverId);
