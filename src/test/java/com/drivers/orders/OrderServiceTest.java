@@ -20,6 +20,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -93,11 +94,12 @@ public class OrderServiceTest {
         // Arrange
         OrderItemReq itemReq = new OrderItemReq(orderItem.getProductId(), 5, null);
         OrderCreateReq req = new OrderCreateReq(warehouseId, BigDecimal.valueOf(1500), "Test comment", List.of(itemReq));
+        String idempotencyKey = UUID.randomUUID().toString();
 
-        when(orderRepo.save(any(DriverOrder.class))).thenReturn(driverOrder);
+        when(orderRepo.saveAndFlush(any(DriverOrder.class))).thenReturn(driverOrder);
 
         // Act
-        OrderDto res = orderService.createOrder(req, driverId);
+        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
 
         // Assert
         assertNotNull(res);
@@ -106,7 +108,7 @@ public class OrderServiceTest {
         assertEquals(driverId, res.driverId());
 
         verify(driverService, times(1)).getDriver(driverId);
-        verify(orderRepo, times(1)).save(any(DriverOrder.class));
+        verify(orderRepo, times(1)).saveAndFlush(any(DriverOrder.class));
         verify(redisTemplate, times(1)).convertAndSend(eq("orders:new"), any());
     }
 
@@ -330,9 +332,10 @@ public class OrderServiceTest {
         OrderCreateReq req = new OrderCreateReq(warehouseId, BigDecimal.valueOf(1500), "Comment", List.of());
         // Имитируем, что модуль водителей выбросил исключение (например, EntityNotFoundException)
         doThrow(new RuntimeException("Driver not found")).when(driverService).getDriver(driverId);
+        String idempotencyKey = UUID.randomUUID().toString();
 
         // Act & Assert
-        assertThrows(RuntimeException.class, () -> orderService.createOrder(req, driverId));
+        assertThrows(RuntimeException.class, () -> orderService.createOrder(req, driverId, idempotencyKey));
         verify(orderRepo, never()).save(any(DriverOrder.class));
     }
 
@@ -393,5 +396,39 @@ public class OrderServiceTest {
         );
         assertTrue(exception.getMessage().contains("В доставку можно передать только подтвержденную заявку"));
         verify(orderRepo, never()).save(any());
+    }
+
+
+    @Test
+    void createOrder_WhenIdempotencyKeyExists_ShouldReturnExistingOrder() {
+        String idempotencyKey = "test-key-123";
+        OrderCreateReq req = new OrderCreateReq(warehouseId, BigDecimal.valueOf(1500), "Test", List.of());
+
+        when(orderRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(driverOrder));
+
+        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+
+        assertNotNull(res);
+        verify(orderRepo, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void createOrder_WhenConcurrencyRaceCondition_ShouldCatchExceptionAndReturnExistingOrder() {
+        String idempotencyKey = "test-key-concurrent";
+        OrderCreateReq req = new OrderCreateReq(warehouseId, BigDecimal.valueOf(1500), "Test", List.of());
+
+        when(orderRepo.findByIdempotencyKey(idempotencyKey))
+                .thenReturn(Optional.empty())
+                .thenReturn(Optional.of(driverOrder));
+
+        when(orderRepo.saveAndFlush(any(DriverOrder.class)))
+                .thenThrow(new DataIntegrityViolationException("Unique index violation"));
+
+        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+
+        assertNotNull(res);
+        assertEquals(driverOrder.getId(), res.id());
+        verify(orderRepo, times(1)).saveAndFlush(any(DriverOrder.class));
+        verify(orderRepo, times(2)).findByIdempotencyKey(idempotencyKey);
     }
 }

@@ -10,7 +10,9 @@ import com.drivers.modules.orders.service.OrderService;
 import com.drivers.shared.util.CurrentDriverId;
 import com.drivers.shared.util.CustomUserDetailsService;
 import com.drivers.shared.util.JwtUtil;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.persistence.criteria.CriteriaBuilder;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +36,8 @@ import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,8 +47,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(
         controllers = DriverOrderSelfController.class,
@@ -113,27 +116,7 @@ public class DriverOrderSelfControllerTest {
 
     @Test
     @WithMockUser(roles = "DRIVER")
-    void createOrder_WithValidBody_ShouldReturnCreated() throws Exception {
-        OrderItemReq item = new OrderItemReq(UUID.randomUUID(), 5, null);
-        OrderCreateReq createReq = new OrderCreateReq(
-                UUID.randomUUID(), BigDecimal.valueOf(700), "Driver test", List.of(item));
-
-        when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID)))
-                .thenReturn(orderDto);
-
-        mockMvc.perform(post("/api/drivers/me/orders")
-                        .with(csrf())
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(createReq)))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.id").value(orderId.toString()))
-                .andExpect(jsonPath("$.status").value("NEW"));
-    }
-
-    @Test
-    @WithMockUser(roles = "DRIVER")
     void createOrder_WithInvalidBody_ShouldReturn400BadRequest() throws Exception {
-        // null, негативное значение, пустой массив
         OrderCreateReq invalidReq = new OrderCreateReq(
                 null, BigDecimal.valueOf(-100), "", List.of());
 
@@ -183,7 +166,108 @@ public class DriverOrderSelfControllerTest {
         mockMvc.perform(post("/api/drivers/me/orders")
                         .with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
+                        .header("Idempotency-Key", "test-idempotency-key")
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(roles = "DRIVER")
+    void createOrder_WhenIdempotencyKeyIsMissing_ShouldReturn400() throws Exception {
+        OrderItemReq item = new OrderItemReq(UUID.randomUUID(), 3, null);
+        OrderCreateReq req = new OrderCreateReq(
+                UUID.randomUUID(), BigDecimal.valueOf(500), "test", List.of(item));
+        mockMvc.perform(post("/api/drivers/me/orders")
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @WithMockUser(roles = "DRIVER")
+    void createOrder_WithIdempotencyKey_ShouldReturn201() throws Exception {
+        OrderItemReq item = new OrderItemReq(UUID.randomUUID(), 3, null);
+        OrderCreateReq req = new OrderCreateReq(UUID.randomUUID(), BigDecimal.valueOf(500), "test", List.of(item));
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID), eq(idempotencyKey)))
+                .thenReturn(orderDto);
+
+        mockMvc.perform(post("/api/drivers/me/orders")
+                        .with(csrf())
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(orderId.toString()));
+    }
+
+    @Test
+    @WithMockUser(roles = "DRIVER")
+    void createOrder_WhenFirstTime_ShouldReturn201AndNoHeader() throws Exception {
+        OrderItemReq item = new OrderItemReq(UUID.randomUUID(), 3, null);
+        OrderCreateReq req = new OrderCreateReq(UUID.randomUUID(), BigDecimal.valueOf(500), "test", List.of(item));
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        OrderDto freshDto = OrderDto.builder()
+                .id(orderId)
+                .driverId(STUB_DRIVER_ID)
+                .warehouseId(UUID.randomUUID())
+                .status(OrderStatus.NEW)
+                .totalAmount(BigDecimal.valueOf(700))
+                .createdAt(Instant.now())
+                .updatedAt(Instant.now())
+                .comment("Driver order test")
+                .items(List.of())
+                .build();
+
+        when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID), eq(idempotencyKey)))
+                .thenReturn(freshDto);
+
+        mockMvc.perform(post("/api/drivers/me/orders")
+                        .with(csrf())
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(orderId.toString()))
+                .andExpect(header().doesNotExist("Idempotency-Replayed"));
+    }
+
+    @Test
+    @WithMockUser(roles = "DRIVER")
+    void createOrder_WhenIdempotencyReplayed_ShouldReturn201AndHeader() throws Exception {
+        OrderItemReq item = new OrderItemReq(UUID.randomUUID(), 3, null);
+        OrderCreateReq req = new OrderCreateReq(UUID.randomUUID(), BigDecimal.valueOf(500), "test", List.of(item));
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        OrderDto replayedDto = OrderDto.builder()
+                .id(orderId)
+                .driverId(STUB_DRIVER_ID)
+                .warehouseId(UUID.randomUUID())
+                .status(OrderStatus.NEW)
+                .totalAmount(BigDecimal.valueOf(700))
+                .comment("Driver order test")
+                .items(List.of())
+                .createdAt(Instant.now().minus(1, ChronoUnit.DAYS))
+                .updatedAt(Instant.now())
+                .build();
+
+
+        when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID), eq(idempotencyKey)))
+                .thenReturn(replayedDto);
+
+        when(orderService.checkIfThisOrderWasAlreadyCreated(any(OrderDto.class)))
+                .thenReturn(true);
+
+        mockMvc.perform(post("/api/drivers/me/orders")
+                        .with(csrf())
+                        .header("Idempotency-Key", idempotencyKey)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(orderId.toString()))
+                .andExpect(header().string("Idempotency-Replayed", "true"));
     }
 }

@@ -6,6 +6,8 @@ import com.drivers.modules.orders.entity.OrderStatus;
 import com.drivers.modules.orders.service.OrderService;
 import com.drivers.shared.util.CurrentDriverId;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
@@ -28,10 +31,19 @@ public class DriverOrderSelfController {
     private final OrderService orderService;
 
     @PostMapping
-    @ResponseStatus(HttpStatus.CREATED)
     @Operation(summary = "Создать новую заявку на товар ")
-    public OrderDto createOrder(@Valid @RequestBody OrderCreateReq req, @CurrentDriverId UUID driverId) {
-        return orderService.createOrder(req, driverId);
+    public ResponseEntity<OrderDto> createOrder(@Valid @RequestBody OrderCreateReq req,
+                                      @CurrentDriverId UUID driverId,
+                                      @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key", description = "Idempotency-Key to prevent duplicates")
+                                @RequestHeader(name = "Idempotency-Key") String idempotencyKey) {
+        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+
+        if(orderService.checkIfThisOrderWasAlreadyCreated(res)){
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .header("Idempotency-Replayed", "true")
+                    .body(res);
+        }
+        return ResponseEntity.status(HttpStatus.CREATED).body(res);
     }
 
     @GetMapping()

@@ -17,6 +17,7 @@ import com.drivers.shared.exception.ex.OrderNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -60,7 +61,13 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderDto createOrder(OrderCreateReq req, UUID driverId) {
+    public OrderDto createOrder(OrderCreateReq req, UUID driverId, String idempotencyKey) {
+        Optional<DriverOrder> optionalOrder = orderRepo.findByIdempotencyKey(idempotencyKey);
+        if(optionalOrder.isPresent()){
+            log.info("Idempotency hit: Returning existing order {}", optionalOrder.get().getId());
+            return toDto(optionalOrder.get());
+        }
+
         driverService.getDriver(driverId);
 
         DriverOrder order = DriverOrder.builder()
@@ -70,15 +77,36 @@ public class OrderServiceImpl implements OrderService {
                 .requestedAt(LocalDateTime.now())
                 .totalAmount(req.totalAmount())
                 .comment(req.comment())
+                .idempotencyKey(idempotencyKey)
                 .items(new ArrayList<>())
                 .build();
 
         req.items().forEach(itemReq -> order.getItems().add(toEntity(itemReq, order)));
 
-        DriverOrder saved = orderRepo.save(order);
-        publishOrderEvent(saved, "ORDER_CREATED", TOPIC_ORDERS_NEW);
-        log.info("Создана новая заявка {} для водителя {}", saved.getId(), saved.getDriverId());
-        return toDto(saved);
+        try {
+            DriverOrder saved = orderRepo.saveAndFlush(order);
+            publishOrderEvent(saved, "ORDER_CREATED", TOPIC_ORDERS_NEW);
+            log.info("Created new order: {} for driver: {}", saved.getId(), saved.getDriverId());
+            return toDto(saved);
+
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrency hit for idempotency key {}. Fetching order saved by another thread.", idempotencyKey);
+            DriverOrder racedOrder = orderRepo.findByIdempotencyKey(idempotencyKey)
+                    .orElseThrow(() -> new RuntimeException("Неожиданная ошибка параллельного выполнения"));
+            return toDto(racedOrder);
+        }
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public boolean checkIfThisOrderWasAlreadyCreated(OrderDto result) {
+        if (result.createdAt() == null) {
+            return false;
+        }
+
+        LocalDateTime createdTime = LocalDateTime.ofInstant(result.createdAt(), ZoneOffset.UTC);
+
+        return createdTime.isBefore(LocalDateTime.now().minusSeconds(2));
     }
 
     @Override
