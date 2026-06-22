@@ -26,6 +26,7 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.*;
@@ -97,16 +98,11 @@ public class OrderServiceImpl implements OrderService {
         }
     }
 
-    @Transactional(readOnly = true)
     @Override
+    @Transactional(readOnly = true)
     public boolean checkIfThisOrderWasAlreadyCreated(OrderDto result) {
-        if (result.createdAt() == null) {
-            return false;
-        }
-
-        LocalDateTime createdTime = LocalDateTime.ofInstant(result.createdAt(), ZoneOffset.UTC);
-
-        return createdTime.isBefore(LocalDateTime.now().minusSeconds(2));
+        return result.createdAt() != null
+                && result.createdAt().isBefore(Instant.now().minusSeconds(2));
     }
 
     @Override

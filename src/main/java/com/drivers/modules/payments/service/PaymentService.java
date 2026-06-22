@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface PaymentService {
     Page<PaymentDto> getPayments(Pageable pageable, UUID driverId, PaymentMethod paymentMethod);
-    PaymentDto createPayment(PaymentCreateReq req);
-    PaymentDto getPayment(UUID id);
+    PaymentDto createPayment(PaymentCreateReq req, String idempotencyKey);
+    PaymentDto getPayment(UUID id, UUID driverId);
+    boolean checkIfThisPaymentWasAlreadyCreated(PaymentDto res);
 }

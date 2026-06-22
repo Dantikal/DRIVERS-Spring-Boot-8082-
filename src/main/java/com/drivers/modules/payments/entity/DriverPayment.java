@@ -4,7 +4,7 @@ import com.drivers.shared.entity.BaseEntity;
 import jakarta.persistence.*;
 import lombok.*;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -26,6 +26,9 @@ public class DriverPayment extends BaseEntity {
     @Column(name = "payment_method", nullable = false)
     private PaymentMethod paymentMethod;
 
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 50)
+    private String idempotencyKey;
+
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
@@ -33,5 +36,5 @@ public class DriverPayment extends BaseEntity {
     private UUID receivedBy;
 
     @Column(name = "paid_at", nullable = false)
-    private LocalDateTime paidAt;
+    private Instant paidAt;
 }

@@ -10,9 +10,8 @@ import java.util.UUID;
 
 @Builder
 public record PaymentCreateReq(
-        @NotNull(message = "ID водителя обязателен")
+        @NotNull(message = "ID водителя обязательно")
         UUID driverId,
-
         @NotNull(message = "Сумма платежа обязательна")
         @DecimalMin(value = "0.01", message = "Сумма платежа должна быть больше 0")
         BigDecimal amount,

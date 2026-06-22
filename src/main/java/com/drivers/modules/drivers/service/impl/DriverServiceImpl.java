@@ -141,12 +141,16 @@ public class DriverServiceImpl implements DriverService {
     @Override
     @Transactional
     public void decreaseDebt(UUID driverId, BigDecimal amount) {
+        if (amount.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Сумма погашения долга должна быть больше нуля");
+        }
         DriverDebt driverDebt = getDriverDebtById(driverId);
         BigDecimal newDebt = driverDebt.getTotalDebt().subtract(amount);
-        if(amount.compareTo(BigDecimal.ZERO) > 0 && newDebt.compareTo(BigDecimal.ZERO) < 0){
-            throw new NegativeDebtException("Долг не может быть негативным");
+        if (newDebt.compareTo(BigDecimal.ZERO) < 0) {
+            throw new NegativeDebtException("Сумма оплаты превышает текущий долг. Долг не может быть негативным");
         }
-        driverDebt.setTotalDebt(driverDebt.getTotalDebt().subtract(amount));
+
+        driverDebt.setTotalDebt(newDebt);
         driverDebtRepository.save(driverDebt);
     }
 

@@ -1,0 +1,193 @@
+package com.drivers.payments;
+
+import com.drivers.modules.drivers.service.DriverService;
+import com.drivers.modules.payments.dto.PaymentDto;
+import com.drivers.modules.payments.dto.req.PaymentCreateReq;
+import com.drivers.modules.payments.entity.DriverPayment;
+import com.drivers.modules.payments.entity.PaymentMethod;
+import com.drivers.modules.payments.repository.DriverPaymentRepo;
+import com.drivers.modules.payments.service.impl.PaymentServiceImpl;
+import com.drivers.shared.exception.ex.PaymentNotFoundException;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
+
+import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+
+@ExtendWith(MockitoExtension.class)
+class PaymentsServiceTest {
+
+    @Mock
+    private DriverPaymentRepo paymentRepo;
+
+    @Mock
+    private DriverService driverService;
+
+    @InjectMocks
+    private PaymentServiceImpl paymentService;
+
+    @Mock
+    private RedisTemplate<String, Object> redisTemplate;
+
+    private UUID driverId;
+    private UUID paymentId;
+    private DriverPayment payment;
+
+    @BeforeEach
+    void setUp() {
+        driverId = UUID.randomUUID();
+        paymentId = UUID.randomUUID();
+        payment = DriverPayment.builder()
+                .driverId(driverId)
+                .amount(BigDecimal.valueOf(1000))
+                .paymentMethod(PaymentMethod.CASH)
+                .paidAt(Instant.now())
+                .build();
+        payment.id = paymentId;
+    }
+
+    @Test
+    void createPayment_AdminRequest_ShouldDecreaseDebtAndSavePaymentAndPublishEvent() {
+        // Arrange
+        PaymentCreateReq req = new PaymentCreateReq(
+                driverId, BigDecimal.valueOf(1000), PaymentMethod.CASH, "Test", UUID.randomUUID()
+        );
+        String idempotencyKey = UUID.randomUUID().toString();
+        when(paymentRepo.save(any(DriverPayment.class))).thenReturn(payment);
+
+        // Act
+        PaymentDto result = paymentService.createPayment(req, idempotencyKey);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(paymentId, result.id());
+        assertEquals(BigDecimal.valueOf(1000), result.amount());
+
+        // Проверяем бизнес-логику
+        verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
+        verify(paymentRepo, times(1)).save(any(DriverPayment.class));
+
+        // ДОБАВЛЕНО: Проверяем, что событие улетело в Redis!
+        verify(redisTemplate, times(1)).convertAndSend(eq("payments:received"), any());
+    }
+
+    @Test
+    void getPayment_WhenAdmin_ShouldFindByIdOnly() {
+        // Arrange
+        when(paymentRepo.findById(paymentId)).thenReturn(Optional.of(payment));
+
+        // Act
+        PaymentDto result = paymentService.getPayment(paymentId, null);
+
+        // Assert
+        assertNotNull(result);
+        verify(paymentRepo, times(1)).findById(paymentId);
+        verify(paymentRepo, never()).findByIdAndDriverId(any(), any());
+    }
+
+    @Test
+    void getPayment_WhenDriver_ShouldFindByIdAndDriverId() {
+        // Arrange
+        when(paymentRepo.findByIdAndDriverId(paymentId, driverId)).thenReturn(Optional.of(payment));
+
+        // Act
+        PaymentDto result = paymentService.getPayment(paymentId, driverId);
+
+        // Assert
+        assertNotNull(result);
+        verify(paymentRepo, never()).findById(any());
+        verify(paymentRepo, times(1)).findByIdAndDriverId(paymentId, driverId);
+    }
+
+    @Test
+    void getPayment_WhenNotFound_ShouldThrowException() {
+        // Arrange
+        when(paymentRepo.findById(paymentId)).thenReturn(Optional.empty());
+
+        // Act & Assert
+        assertThrows(PaymentNotFoundException.class, () -> paymentService.getPayment(paymentId, null));
+    }
+
+    @Test
+    void getPayments_ShouldReturnPagedResult() {
+        // Arrange
+        PageRequest pageable = PageRequest.of(0, 20);
+        Page<DriverPayment> page = new PageImpl<>(List.of(payment));
+        when(paymentRepo.findAll(any(Specification.class), eq(pageable))).thenReturn(page);
+
+        // Act
+        Page<PaymentDto> result = paymentService.getPayments(pageable, driverId, PaymentMethod.CASH);
+
+        // Assert
+        assertEquals(1, result.getTotalElements());
+        assertEquals(driverId, result.getContent().get(0).driverId());
+    }
+    @Test
+    void createPayment_WhenNewKey_ShouldDecreaseDebtAndSaveAndPublishEvent() {
+        PaymentCreateReq req = new PaymentCreateReq(
+                driverId, BigDecimal.valueOf(1000), PaymentMethod.CASH, "Test", UUID.randomUUID()
+        );
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        when(paymentRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
+        when(paymentRepo.save(any(DriverPayment.class))).thenReturn(payment);
+
+        PaymentDto result = paymentService.createPayment(req, idempotencyKey);
+
+        assertNotNull(result);
+        assertEquals(paymentId, result.id());
+
+        verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
+        verify(paymentRepo, times(1)).save(any(DriverPayment.class));
+        verify(redisTemplate, times(1)).convertAndSend(eq("payments:received"), any());
+    }
+
+    @Test
+    void createPayment_WhenExistingKey_ShouldReturnExistingAndNotProcessAgain() {
+        PaymentCreateReq req = new PaymentCreateReq(
+                driverId, BigDecimal.valueOf(1000), PaymentMethod.CASH, "Test", UUID.randomUUID()
+        );
+        String idempotencyKey = UUID.randomUUID().toString();
+
+        when(paymentRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(payment));
+
+        PaymentDto result = paymentService.createPayment(req, idempotencyKey);
+
+        assertNotNull(result);
+        assertEquals(paymentId, result.id());
+
+        verify(driverService, never()).decreaseDebt(any(), any());
+        verify(paymentRepo, never()).save(any());
+        verify(redisTemplate, never()).convertAndSend(anyString(), any());
+    }
+
+    @Test
+    void checkIfThisPaymentWasAlreadyCreated_WhenFresh_ShouldReturnFalse() {
+        PaymentDto freshDto = PaymentDto.builder().createdAt(Instant.now()).build();
+        assertFalse(paymentService.checkIfThisPaymentWasAlreadyCreated(freshDto));
+    }
+
+    @Test
+    void checkIfThisPaymentWasAlreadyCreated_WhenOld_ShouldReturnTrue() {
+        PaymentDto oldDto = PaymentDto.builder().createdAt(Instant.now().minus(5, ChronoUnit.SECONDS)).build();
+        assertTrue(paymentService.checkIfThisPaymentWasAlreadyCreated(oldDto));
+    }
+
+}

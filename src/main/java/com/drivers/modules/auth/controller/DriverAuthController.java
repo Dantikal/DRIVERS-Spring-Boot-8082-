@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/drivers/auth")
 @RequiredArgsConstructor
-@Tag(name="Driver auth", description = "Эндпоинты для аутентификации водителей")
+@Tag(name="Driver - Auth", description = "Эндпоинты для аутентификации водителей")
 public class DriverAuthController {
 
     private final DriverAuthService driverAuthService;

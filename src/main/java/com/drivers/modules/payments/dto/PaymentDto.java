@@ -5,7 +5,6 @@ import lombok.Builder;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Builder
@@ -16,7 +15,7 @@ public record PaymentDto(
         PaymentMethod paymentMethod,
         String comment,
         UUID receivedBy,
-        LocalDateTime paidAt,
+        Instant paidAt,
         Instant createdAt,
         Instant updatedAt
 ) {}
