@@ -15,10 +15,7 @@ import com.drivers.modules.drivers.repository.DriverDebtRepository;
 import com.drivers.modules.drivers.repository.DriverRepository;
 import com.drivers.modules.drivers.repository.specification.DriverSpecification;
 import com.drivers.modules.drivers.service.DriverService;
-import com.drivers.shared.exception.ex.CarNumberAlreadyExistsException;
-import com.drivers.shared.exception.ex.DriverNotFoundException;
-import com.drivers.shared.exception.ex.NegativeDebtException;
-import com.drivers.shared.exception.ex.PhoneAlreadyExistsException;
+import com.drivers.shared.exception.ex.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -132,11 +129,15 @@ public class DriverServiceImpl implements DriverService {
     @Override
     @Transactional
     public void increaseDebt(UUID driverId, BigDecimal amount) {
-        DriverDebt driverDebt = getDriverDebtById(driverId);
+        DriverDebt driverDebt = getDriverDebtForUpdate(driverId);
         driverDebt.setTotalDebt(driverDebt.getTotalDebt().add(amount));
         driverDebtRepository.save(driverDebt);
     }
 
+    private DriverDebt getDriverDebtForUpdate(UUID driverId) {
+        return driverDebtRepository.findByDriverIdForUpdate(driverId).orElseThrow(
+                ()->new DriverDebtNotFoundException("Долг не найден"));
+    }
 
     @Override
     @Transactional
@@ -144,7 +145,7 @@ public class DriverServiceImpl implements DriverService {
         if (amount.compareTo(BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Сумма погашения долга должна быть больше нуля");
         }
-        DriverDebt driverDebt = getDriverDebtById(driverId);
+        DriverDebt driverDebt = getDriverDebtForUpdate(driverId);
         BigDecimal newDebt = driverDebt.getTotalDebt().subtract(amount);
         if (newDebt.compareTo(BigDecimal.ZERO) < 0) {
             throw new NegativeDebtException("Сумма оплаты превышает текущий долг. Долг не может быть негативным");
@@ -184,6 +185,6 @@ public class DriverServiceImpl implements DriverService {
         return driverRepository.findById(id).orElseThrow(()->new DriverNotFoundException("Водитель с ID: " + id + " не найден"));
     }
     private DriverDebt getDriverDebtById(UUID driverId) {
-        return driverDebtRepository.findByDriverId(driverId).orElseThrow(()->new DriverNotFoundException("Водитель с таким ID: " + driverId + " не найден"));
+        return driverDebtRepository.findByDriverId(driverId).orElseThrow(()->new DriverDebtNotFoundException("Водитель с таким ID: " + driverId + " не найден"));
     }
 }

@@ -169,6 +169,12 @@ public class GlobalExceptionHandler {
                 .body(buildError("negative_debt", ex.getMessage(), null));
     }
 
+    @ExceptionHandler(DriverDebtNotFoundException.class)
+    public ResponseEntity<ErrorResponse> handleDriverDebtNotFound(DriverDebtNotFoundException ex) {
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(buildError("debt_not_found", ex.getMessage(), null));
+    }
+
 
     // ==================== VALIDATION EXCEPTIONS ====================
 
