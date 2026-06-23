@@ -9,10 +9,12 @@ import com.drivers.modules.payments.entity.DriverPayment;
 import com.drivers.modules.payments.entity.PaymentMethod;
 import com.drivers.modules.payments.repository.DriverPaymentRepo;
 import com.drivers.modules.payments.service.PaymentService;
+import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.exception.ex.PaymentNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -21,8 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -58,13 +58,12 @@ public class PaymentServiceImpl implements PaymentService {
 
     @Override
     @Transactional
-    public PaymentDto createPayment(PaymentCreateReq req, String idempotencyKey) {
-            Optional<DriverPayment> optionalPayment = paymentRepo.findByIdempotencyKey(idempotencyKey);
-            if(optionalPayment.isPresent()){
-                log.info("Idempotency hit: Returning existing payment {}", optionalPayment.get().getId());
-                return toDto(optionalPayment.get());
-            }
-        driverService.decreaseDebt(req.driverId(), req.amount());
+    public IdempotentResponse<PaymentDto> createPayment(PaymentCreateReq req, String idempotencyKey) {
+        Optional<DriverPayment> optionalPayment = paymentRepo.findByIdempotencyKey(idempotencyKey);
+        if(optionalPayment.isPresent()){
+            log.info("Idempotency hit: Returning existing payment {}", optionalPayment.get().getId());
+            return new IdempotentResponse<>(toDto(optionalPayment.get()), true);
+        }
 
         DriverPayment payment = DriverPayment.builder()
                 .driverId(req.driverId())
@@ -76,20 +75,22 @@ public class PaymentServiceImpl implements PaymentService {
                 .paidAt(Instant.now())
                 .build();
 
-        DriverPayment saved = paymentRepo.save(payment);
-        log.info("Created payment {} for driver {}", saved.getId(), saved.getDriverId());
-        publishPaymentReceivedEvent(saved);
-        return toDto(saved);
-    }
+        try {
+            driverService.decreaseDebt(req.driverId(), req.amount());
+            DriverPayment saved = paymentRepo.saveAndFlush(payment); // Используем flush для немедленной проверки констрейнтов БД
 
-    @Override
-    public boolean checkIfThisPaymentWasAlreadyCreated(PaymentDto res) {
-        if (res.createdAt() == null) {
-            return false;
+            log.info("Created payment {} for driver {}", saved.getId(), saved.getDriverId());
+            publishPaymentReceivedEvent(saved);
+
+            return new IdempotentResponse<>(toDto(saved), false);
+
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrency hit for idempotency key {}. Fetching saved payment.", idempotencyKey);
+            DriverPayment racedPayment = paymentRepo.findByIdempotencyKey(idempotencyKey)
+                    .orElseThrow(() -> new RuntimeException("Неожиданная ошибка параллельного выполнения"));
+
+            return new IdempotentResponse<>(toDto(racedPayment), true);
         }
-
-        return res.createdAt()
-                .isBefore(Instant.now().minusSeconds(2));
     }
 
     private void publishPaymentReceivedEvent(DriverPayment payment) {
@@ -104,14 +105,13 @@ public class PaymentServiceImpl implements PaymentService {
                     .build();
 
             redisTemplate.convertAndSend(TOPIC_PAYMENTS_RECEIVED, event);
-            log.info("Published payment received event to topic '{}' for payment{}",
+            log.info("Published payment received event to topic '{}' for payment {}",
                     TOPIC_PAYMENTS_RECEIVED, payment.getId());
 
         } catch (Exception e) {
             log.error("Couldn't publish payment event: {}: {}", payment.getId(), e.getMessage());
         }
     }
-
 
     @Override
     @Transactional(readOnly = true)

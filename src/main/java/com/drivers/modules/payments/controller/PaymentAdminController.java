@@ -4,6 +4,7 @@ import com.drivers.modules.payments.dto.PaymentDto;
 import com.drivers.modules.payments.dto.req.PaymentCreateReq;
 import com.drivers.modules.payments.entity.PaymentMethod;
 import com.drivers.modules.payments.service.PaymentService;
+import com.drivers.shared.dto.IdempotentResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.enums.ParameterIn;
@@ -27,20 +28,24 @@ import java.util.UUID;
 @Tag(name = "Warehouse — Payments", description = "Прием оплат от водителей")
 public class PaymentAdminController {
 
-    private final PaymentService paymentService;
+    private final PaymentService        // 1. Проверка идемпотентности
+ paymentService;
 
     @PostMapping()
     @Operation(summary = "Провести платеж (списать долг водителя)")
     public ResponseEntity<PaymentDto> createPayment(@Valid @RequestBody PaymentCreateReq req,
-                                                    @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key",description = "Idempotency-Key to prevent duplicates")
-                                    @RequestHeader(name = "Idempotency-Key") String idempotencyKey) {
-        PaymentDto res =  paymentService.createPayment(req, idempotencyKey);
-        if(paymentService.checkIfThisPaymentWasAlreadyCreated(res)){
-            return ResponseEntity.status(HttpStatus.CREATED)
+                                                    @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key", description = "Idempotency-Key to prevent duplicates")
+                                                    @RequestHeader(name = "Idempotency-Key") String idempotencyKey) {
+
+        IdempotentResponse<PaymentDto> response = paymentService.createPayment(req, idempotencyKey);
+
+        if(response.isReplayed()) {
+            return ResponseEntity.status(HttpStatus.OK)
                     .header("Idempotency-Replayed", "true")
-                    .body(res);
+                    .body(response.data());
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(res);
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(response.data());
     }
 
     @GetMapping

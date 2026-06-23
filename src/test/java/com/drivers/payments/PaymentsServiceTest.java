@@ -2,11 +2,13 @@ package com.drivers.payments;
 
 import com.drivers.modules.drivers.service.DriverService;
 import com.drivers.modules.payments.dto.PaymentDto;
+import com.drivers.modules.payments.dto.event.PaymentEvent;
 import com.drivers.modules.payments.dto.req.PaymentCreateReq;
 import com.drivers.modules.payments.entity.DriverPayment;
 import com.drivers.modules.payments.entity.PaymentMethod;
 import com.drivers.modules.payments.repository.DriverPaymentRepo;
 import com.drivers.modules.payments.service.impl.PaymentServiceImpl;
+import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.exception.ex.PaymentNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -70,19 +72,19 @@ class PaymentsServiceTest {
                 driverId, BigDecimal.valueOf(1000), PaymentMethod.CASH, "Test", UUID.randomUUID()
         );
         String idempotencyKey = UUID.randomUUID().toString();
-        when(paymentRepo.save(any(DriverPayment.class))).thenReturn(payment);
+        when(paymentRepo.saveAndFlush(any(DriverPayment.class))).thenReturn(payment);
 
         // Act
-        PaymentDto result = paymentService.createPayment(req, idempotencyKey);
+        IdempotentResponse<PaymentDto> result = paymentService.createPayment(req, idempotencyKey);
 
         // Assert
         assertNotNull(result);
-        assertEquals(paymentId, result.id());
-        assertEquals(BigDecimal.valueOf(1000), result.amount());
+        assertEquals(paymentId, result.data().id());
+        assertEquals(BigDecimal.valueOf(1000), result.data().amount());
 
         // Проверяем бизнес-логику
         verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
-        verify(paymentRepo, times(1)).save(any(DriverPayment.class));
+        verify(paymentRepo, times(1)).saveAndFlush(any(DriverPayment.class));
 
         // ДОБАВЛЕНО: Проверяем, что событие улетело в Redis!
         verify(redisTemplate, times(1)).convertAndSend(eq("payments:received"), any());
@@ -147,15 +149,15 @@ class PaymentsServiceTest {
         String idempotencyKey = UUID.randomUUID().toString();
 
         when(paymentRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
-        when(paymentRepo.save(any(DriverPayment.class))).thenReturn(payment);
+        when(paymentRepo.saveAndFlush(any(DriverPayment.class))).thenReturn(payment);
 
-        PaymentDto result = paymentService.createPayment(req, idempotencyKey);
+        IdempotentResponse<PaymentDto> result = paymentService.createPayment(req, idempotencyKey);
 
         assertNotNull(result);
-        assertEquals(paymentId, result.id());
+        assertEquals(paymentId, result.data().id());
 
         verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
-        verify(paymentRepo, times(1)).save(any(DriverPayment.class));
+        verify(paymentRepo, times(1)).saveAndFlush(any(DriverPayment.class));
         verify(redisTemplate, times(1)).convertAndSend(eq("payments:received"), any());
     }
 
@@ -168,26 +170,14 @@ class PaymentsServiceTest {
 
         when(paymentRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(payment));
 
-        PaymentDto result = paymentService.createPayment(req, idempotencyKey);
+        IdempotentResponse<PaymentDto> result = paymentService.createPayment(req, idempotencyKey);
 
         assertNotNull(result);
-        assertEquals(paymentId, result.id());
+        assertEquals(paymentId, result.data().id());
 
         verify(driverService, never()).decreaseDebt(any(), any());
         verify(paymentRepo, never()).save(any());
         verify(redisTemplate, never()).convertAndSend(anyString(), any());
-    }
-
-    @Test
-    void checkIfThisPaymentWasAlreadyCreated_WhenFresh_ShouldReturnFalse() {
-        PaymentDto freshDto = PaymentDto.builder().createdAt(Instant.now()).build();
-        assertFalse(paymentService.checkIfThisPaymentWasAlreadyCreated(freshDto));
-    }
-
-    @Test
-    void checkIfThisPaymentWasAlreadyCreated_WhenOld_ShouldReturnTrue() {
-        PaymentDto oldDto = PaymentDto.builder().createdAt(Instant.now().minus(5, ChronoUnit.SECONDS)).build();
-        assertTrue(paymentService.checkIfThisPaymentWasAlreadyCreated(oldDto));
     }
 
 }
