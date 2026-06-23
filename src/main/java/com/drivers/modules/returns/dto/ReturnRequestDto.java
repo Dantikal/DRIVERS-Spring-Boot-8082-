@@ -13,7 +13,7 @@ import java.util.UUID;
 public record ReturnRequestDto(
         UUID id,
         UUID driverId,
-        LocalDateTime returnedAt,
+        Instant returnedAt,
         BigDecimal totalAmount,
         ReturnStatus status,
         List<ReturnItemDto> items,

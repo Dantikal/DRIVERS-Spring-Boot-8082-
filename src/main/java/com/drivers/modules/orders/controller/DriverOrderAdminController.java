@@ -21,7 +21,7 @@ import java.util.UUID;
 @RequestMapping("/api/drivers/orders")
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('WAREHOUSE_MANAGER')")
-@Tag(name = "Warehouse — Orders Management", description = "Панель управления накладными/заявками для завскладом")
+@Tag(name = "Warehouse — Orders", description = "Панель управления накладными/заявками для завскладом")
 public class DriverOrderAdminController {
 
     private final OrderService orderService;

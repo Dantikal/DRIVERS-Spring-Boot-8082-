@@ -4,6 +4,7 @@ import com.drivers.modules.drivers.service.DriverService;
 import com.drivers.modules.returns.dto.PhotoUploadResponse;
 import com.drivers.modules.returns.dto.ReturnItemDto;
 import com.drivers.modules.returns.dto.ReturnRequestDto;
+import com.drivers.modules.returns.dto.event.ReturnEvent;
 import com.drivers.modules.returns.dto.req.ReturnCreateReq;
 import com.drivers.modules.returns.dto.req.ReturnItemReq;
 import com.drivers.modules.returns.entity.ReturnItem;
@@ -11,14 +12,18 @@ import com.drivers.modules.returns.entity.ReturnRequest;
 import com.drivers.modules.returns.entity.ReturnStatus;
 import com.drivers.modules.returns.repository.ReturnRequestRepo;
 import com.drivers.modules.returns.service.ReturnService;
+import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.exception.ex.ReturnNotFoundException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -30,12 +35,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -44,6 +46,8 @@ public class ReturnServiceImpl implements ReturnService {
 
     private final ReturnRequestRepo returnRequestRepo;
     private final DriverService driverService;
+
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @Value("${drivers.uploads.returns-dir:uploads/returns}")
     private String returnsUploadDir;
@@ -67,27 +71,53 @@ public class ReturnServiceImpl implements ReturnService {
 
     @Override
     @Transactional
-    public ReturnRequestDto createReturn(ReturnCreateReq req) {
-        driverService.decreaseDebt(req.driverId(), req.totalAmount());
+    public IdempotentResponse<ReturnRequestDto> createReturn(ReturnCreateReq req, UUID driverId, String idempotencyKey) {
+        Optional<ReturnRequest> optionalReturn = returnRequestRepo.findByIdempotencyKey(idempotencyKey);
+        if (optionalReturn.isPresent()) {
+            log.info("Idempotency hit: Возврат существующей заявки {}", optionalReturn.get().getId());
+            return new IdempotentResponse<>(toDto(optionalReturn.get()), true); // <-- isReplayed = true
+        }
 
         ReturnRequest returnRequest = ReturnRequest.builder()
-                .driverId(req.driverId())
-                .returnedAt(LocalDateTime.now())
+                .driverId(driverId)
+                .returnedAt(Instant.now())
                 .totalAmount(req.totalAmount())
                 .status(ReturnStatus.PENDING)
+                .idempotencyKey(idempotencyKey)
                 .items(new ArrayList<>())
                 .build();
 
         req.items().forEach(item -> returnRequest.getItems().add(toEntity(item, returnRequest)));
-        ReturnRequest saved = returnRequestRepo.save(returnRequest);
-        log.info("Created return {} for driver {}", saved.getId(), saved.getDriverId());
-        return toDto(saved);
-    }
 
+        try {
+            ReturnRequest saved = returnRequestRepo.saveAndFlush(returnRequest);
+            publishReturnEvent(saved, "RETURN_CREATED");
+            log.info("Created return {} for driver {}", saved.getId(), saved.getDriverId());
+
+            return new IdempotentResponse<>(toDto(saved), false);
+
+        } catch (DataIntegrityViolationException e) {
+            log.warn("Concurrency hit for idempotency key {}. Fetching saved return request.", idempotencyKey);
+            ReturnRequest racedReturn = returnRequestRepo.findByIdempotencyKey(idempotencyKey)
+                    .orElseThrow(() -> new RuntimeException("Неожиданная ошибка параллельного выполнения"));
+
+            return new IdempotentResponse<>(toDto(racedReturn), true); // <-- isReplayed = true
+        }
+    }
     @Override
     @Transactional(readOnly = true)
     public ReturnRequestDto getReturn(UUID id) {
         return toDto(getReturnById(id));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReturnRequestDto getReturn(UUID id, UUID driverId) {
+        ReturnRequest returnRequest = getReturnById(id);
+        if (!returnRequest.getDriverId().equals(driverId)) {
+            throw new AccessDeniedException("Вы не имеете доступа к данной заявке на возврат");
+        }
+        return toDto(returnRequest);
     }
 
     @Override
@@ -119,6 +149,77 @@ public class ReturnServiceImpl implements ReturnService {
         log.info("Uploaded return photo {}", photoUrl);
         return PhotoUploadResponse.builder().photoUrl(photoUrl).build();
     }
+
+    @Override
+    @Transactional
+    public ReturnRequestDto acceptReturn(UUID id) {
+        ReturnRequest returnRequest = getReturnById(id);
+
+        if (returnRequest.getStatus() != ReturnStatus.PENDING) {
+            throw new IllegalStateException("Можно подтвердить только возврат в статусе PENDING");
+        }
+
+        returnRequest.setStatus(ReturnStatus.ACCEPTED);
+        ReturnRequest saved = returnRequestRepo.save(returnRequest);
+
+        driverService.decreaseDebt(saved.getDriverId(), saved.getTotalAmount());
+
+        publishReturnEvent(saved, "RETURN_ACCEPTED");
+
+        log.info("Зав. склада принял возврат {}. Долг водителя {} уменьшен на {}",
+                id, saved.getDriverId(), saved.getTotalAmount());
+
+        return toDto(saved);
+    }
+
+    @Override
+    @Transactional
+    public ReturnRequestDto rejectReturn(UUID id) {
+        ReturnRequest returnRequest = getReturnById(id);
+
+        if (returnRequest.getStatus() != ReturnStatus.PENDING) {
+            throw new IllegalStateException("Можно отклонить только возврат в статусе PENDING");
+        }
+
+        returnRequest.setStatus(ReturnStatus.REJECTED);
+        ReturnRequest saved = returnRequestRepo.save(returnRequest);
+
+        publishReturnEvent(saved, "RETURN_REJECTED");
+
+        log.info("Зав. склада отклонил возврат {}. Долг водителя {} не изменился", id, saved.getDriverId());
+
+        return toDto(saved);
+    }
+
+    private void publishReturnEvent(ReturnRequest returnRequest, String eventType) {
+        try {
+            List<ReturnEvent.ReturnItemEvent> itemEvents = returnRequest.getItems().stream()
+                    .map(item -> ReturnEvent.ReturnItemEvent.builder()
+                            .productId(item.getProductId())
+                            .qtyBoxes(item.getQtyBoxes())
+                            .qtyPieces(item.getQtyPieces())
+                            .reason(item.getReason())
+                            .build())
+                    .toList();
+
+            ReturnEvent event = ReturnEvent.builder()
+                    .returnId(returnRequest.getId())
+                    .driverId(returnRequest.getDriverId())
+                    .status(returnRequest.getStatus())
+                    .totalAmount(returnRequest.getTotalAmount())
+                    .eventType(eventType)
+                    .timestamp(LocalDateTime.now().toString())
+                    .items(itemEvents)
+                    .build();
+
+            redisTemplate.convertAndSend("returns:processed", event);
+            log.info("Опубликовано событие {} для возврата {}", event.eventType(), returnRequest.getId());
+        } catch (Exception e) {
+            log.error("Не удалось опубликовать событие возврата {}: {}", returnRequest.getId(), e.getMessage());
+        }
+    }
+
+
 
     private ReturnRequest getReturnById(UUID id) {
         return returnRequestRepo.findById(id)
