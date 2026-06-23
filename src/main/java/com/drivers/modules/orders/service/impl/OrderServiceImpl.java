@@ -1,5 +1,6 @@
 package com.drivers.modules.orders.service.impl;
 
+import com.drivers.modules.drivers.entity.Driver;
 import com.drivers.modules.drivers.service.DriverService;
 import com.drivers.modules.events.dto.DriverOrderEvent;
 import com.drivers.modules.orders.dto.OrderDto;
@@ -75,7 +76,7 @@ public class OrderServiceImpl implements OrderService {
                 .driverId(driverId)
                 .warehouseId(req.warehouseId())
                 .status(OrderStatus.NEW)
-                .requestedAt(LocalDateTime.now())
+                .requestedAt(Instant.now())
                 .totalAmount(req.totalAmount())
                 .comment(req.comment())
                 .idempotencyKey(idempotencyKey)
@@ -139,7 +140,7 @@ public class OrderServiceImpl implements OrderService {
 
         DriverOrder saved = orderRepo.save(order);
         driverService.getDriver(order.getDriverId());
-        driverService.increaseDebt(order.getDriverId(), order.getTotalAmount());
+        // driverService.increaseDebt(order.getDriverId(), order.getTotalAmount());
 
         publishOrderEvent(saved, "ORDER_UPDATED", TOPIC_ORDERS_UPDATED);
         log.info("Зав. склада подтвердил выдачу заявки {}. Начислен долг водителю {}: {}",
@@ -197,6 +198,7 @@ public class OrderServiceImpl implements OrderService {
         }
 
         order.setStatus(OrderStatus.DISPATCHED);
+        driverService.increaseDebt(order.getDriverId(), order.getTotalAmount());
         DriverOrder saved = orderRepo.save(order);
 
         publishOrderEvent(saved, "ORDER_DISPATCHED", TOPIC_ORDERS_UPDATED);
@@ -248,7 +250,7 @@ public class OrderServiceImpl implements OrderService {
                 .warehouseId(order.getWarehouseId())
                 .status(order.getStatus())
                 .requestedAt(order.getRequestedAt() != null
-                        ? order.getRequestedAt().toInstant(ZoneOffset.UTC)
+                        ? order.getRequestedAt()
                         : null)
                 .totalAmount(order.getTotalAmount())
                 .comment(order.getComment())

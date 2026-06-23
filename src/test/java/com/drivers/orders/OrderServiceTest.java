@@ -30,6 +30,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -71,7 +72,7 @@ public class OrderServiceTest {
                 .driverId(driverId)
                 .warehouseId(warehouseId)
                 .status(OrderStatus.NEW)
-                .requestedAt(LocalDateTime.now())
+                .requestedAt(Instant.now())
                 .totalAmount(BigDecimal.valueOf(1500))
                 .comment("Test comment")
                 .items(new ArrayList<>())
@@ -113,7 +114,7 @@ public class OrderServiceTest {
     }
 
     @Test
-    void confirmOrder_Success_ShouldIncreaseDriverDebtAndChangeStatus() {
+    void confirmOrder_Success_ShouldChangeStatus() {
         // Arrange
         when(orderRepo.findById(orderId)).thenReturn(Optional.of(driverOrder));
         when(orderRepo.save(any(DriverOrder.class))).thenReturn(driverOrder);
@@ -126,7 +127,6 @@ public class OrderServiceTest {
         assertEquals(OrderStatus.CONFIRMED, res.status());
         assertEquals(orderItem.getRequestedQty(), driverOrder.getItems().get(0).getApprovedQty());
 
-        verify(driverService, times(1)).increaseDebt(driverId, BigDecimal.valueOf(1500));
         verify(orderRepo, times(1)).save(driverOrder);
         verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
     }
@@ -384,7 +384,24 @@ public class OrderServiceTest {
         verify(orderRepo, times(1)).save(driverOrder);
         verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
     }
+    @Test
+    void dispatchOrder_Success_ShouldIncreaseDriverDebtAndChangeStatus() {
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(driverOrder));
+        when(orderRepo.save(any(DriverOrder.class))).thenReturn(driverOrder);
 
+        driverOrder.setStatus(OrderStatus.CONFIRMED);
+        driverOrder.getItems().get(0).setApprovedQty(driverOrder.getItems().get(0).getRequestedQty());
+
+        OrderDto res = orderService.markDispatched(orderId);
+
+        assertNotNull(res);
+        assertEquals(OrderStatus.DISPATCHED, res.status());
+        assertEquals(orderItem.getRequestedQty(), driverOrder.getItems().get(0).getApprovedQty());
+
+        verify(driverService, times(1)).increaseDebt(driverId, BigDecimal.valueOf(1500));
+        verify(orderRepo, times(1)).save(driverOrder);
+        verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
+    }
     @Test
     void markDispatched_WhenStatusNotConfirmed_ShouldThrowIllegalStateException() {
         driverOrder.setStatus(OrderStatus.NEW);
