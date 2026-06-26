@@ -263,11 +263,11 @@ public class DriverServiceTest {
     void increaseDebt_whenDebtIncreased_thenDebtIncreased(){
         BigDecimal debt = BigDecimal.valueOf(1000);
 
-        when(driverDebtRepository.findByDriverId(any(UUID.class))).thenReturn(java.util.Optional.of(driverDebt));
+        when(driverDebtRepository.findByDriverIdForUpdate(any(UUID.class))).thenReturn(java.util.Optional.of(driverDebt));
 
         driverService.increaseDebt(driverId, debt);
 
-        verify(driverDebtRepository, times(1)).findByDriverId(any(UUID.class));
+        verify(driverDebtRepository, times(1)).findByDriverIdForUpdate(any(UUID.class));
         verify(driverDebtRepository, times(1)).save(any(DriverDebt.class));
     }
 
@@ -276,13 +276,13 @@ public class DriverServiceTest {
         BigDecimal debt = BigDecimal.valueOf(1000);
         driverDebt.setTotalDebt(debt);
 
-        when(driverDebtRepository.findByDriverId(any(UUID.class))).thenReturn(java.util.Optional.of(driverDebt));
+        when(driverDebtRepository.findByDriverIdForUpdate(any(UUID.class))).thenReturn(java.util.Optional.of(driverDebt));
 
         driverService.decreaseDebt(driverId, debt);
 
         assertEquals(BigDecimal.ZERO, driverDebt.getTotalDebt());
 
-        verify(driverDebtRepository, times(1)).findByDriverId(any(UUID.class));
+        verify(driverDebtRepository, times(1)).findByDriverIdForUpdate(any(UUID.class));
         verify(driverDebtRepository, times(1)).save(any(DriverDebt.class));
     }
 
@@ -290,11 +290,11 @@ public class DriverServiceTest {
     void decreaseDebt_whenDebtDecreasedAndTotalDebtIsNegative_thenThrowException(){
         BigDecimal debt = BigDecimal.valueOf(1000);
 
-        when(driverDebtRepository.findByDriverId(any(UUID.class))).thenReturn(java.util.Optional.of(driverDebt));
+        when(driverDebtRepository.findByDriverIdForUpdate(any(UUID.class))).thenReturn(java.util.Optional.of(driverDebt));
 
         assertThrows(NegativeDebtException.class, () -> driverService.decreaseDebt(driverId, debt));
 
-        verify(driverDebtRepository, times(1)).findByDriverId(any(UUID.class));
+        verify(driverDebtRepository, times(1)).findByDriverIdForUpdate(any(UUID.class));
         verifyNoInteractions(driverRepository);
     }
 
