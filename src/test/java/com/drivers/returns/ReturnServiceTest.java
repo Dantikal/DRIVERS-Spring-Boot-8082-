@@ -25,8 +25,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.mock.web.MockMultipartFile;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
@@ -53,7 +53,7 @@ public class ReturnServiceTest {
     private DriverService driverService;
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private DriverEventPublisher eventPublisher;
 
     @InjectMocks
     private ReturnServiceImpl returnService;
@@ -99,7 +99,7 @@ public class ReturnServiceTest {
         assertFalse(res.isReplayed());
         assertEquals(ReturnStatus.PENDING, res.data().status());
         verify(returnRequestRepo, times(1)).saveAndFlush(any(ReturnRequest.class));
-        verify(redisTemplate, times(1)).convertAndSend(eq("returns:processed"), any());
+        verify(eventPublisher, times(1)).publishReturnProcessed(any());
     }
 
     @Test
@@ -174,7 +174,7 @@ public class ReturnServiceTest {
 
         assertEquals(ReturnStatus.ACCEPTED, res.status());
         verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(100.50));
-        verify(redisTemplate, times(1)).convertAndSend(eq("returns:processed"), any());
+        verify(eventPublisher, times(1)).publishReturnProcessed(any());
     }
 
     @Test
@@ -195,7 +195,7 @@ public class ReturnServiceTest {
 
         assertEquals(ReturnStatus.REJECTED, res.status());
         verify(driverService, never()).decreaseDebt(any(), any());
-        verify(redisTemplate, times(1)).convertAndSend(eq("returns:processed"), any());
+        verify(eventPublisher, times(1)).publishReturnProcessed(any());
     }
 
     @Test

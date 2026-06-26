@@ -18,9 +18,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -46,7 +47,7 @@ class PaymentsServiceTest {
     private PaymentServiceImpl paymentService;
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private DriverEventPublisher eventPublisher;
 
     private UUID driverId;
     private UUID paymentId;
@@ -87,7 +88,7 @@ class PaymentsServiceTest {
         verify(paymentRepo, times(1)).saveAndFlush(any(DriverPayment.class));
 
         // ДОБАВЛЕНО: Проверяем, что событие улетело в Redis!
-        verify(redisTemplate, times(1)).convertAndSend(eq("payments:received"), any());
+        verify(eventPublisher, times(1)).publishPaymentReceived(any());
     }
 
     @Test
@@ -158,7 +159,7 @@ class PaymentsServiceTest {
 
         verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
         verify(paymentRepo, times(1)).saveAndFlush(any(DriverPayment.class));
-        verify(redisTemplate, times(1)).convertAndSend(eq("payments:received"), any());
+        verify(eventPublisher, times(1)).publishPaymentReceived(any());
     }
 
     @Test
@@ -177,7 +178,7 @@ class PaymentsServiceTest {
 
         verify(driverService, never()).decreaseDebt(any(), any());
         verify(paymentRepo, never()).save(any());
-        verify(redisTemplate, never()).convertAndSend(anyString(), any());
+        verify(eventPublisher, never()).publishPaymentReceived(any());
     }
 
 }

@@ -26,7 +26,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -51,7 +51,7 @@ public class OrderServiceTest {
     private DriverService driverService;
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private DriverEventPublisher eventPublisher;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -110,7 +110,7 @@ public class OrderServiceTest {
 
         verify(driverService, times(1)).getDriver(driverId);
         verify(orderRepo, times(1)).saveAndFlush(any(DriverOrder.class));
-        verify(redisTemplate, times(1)).convertAndSend(eq("orders:new"), any());
+        verify(eventPublisher, times(1)).publishOrderNew(any());
     }
 
     @Test
@@ -128,7 +128,7 @@ public class OrderServiceTest {
         assertEquals(orderItem.getRequestedQty(), driverOrder.getItems().get(0).getApprovedQty());
 
         verify(orderRepo, times(1)).save(driverOrder);
-        verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
+        verify(eventPublisher, times(1)).publishOrderUpdated(any());
     }
 
     @Test
@@ -170,7 +170,7 @@ public class OrderServiceTest {
         assertEquals(newProductId, driverOrder.getItems().get(0).getProductId());
 
         verify(orderRepo, times(1)).save(driverOrder);
-        verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
+        verify(eventPublisher, times(1)).publishOrderUpdated(any());
     }
 
     @Test
@@ -201,7 +201,7 @@ public class OrderServiceTest {
         assertEquals("Товара нет на остатках", driverOrder.getComment());
 
         verify(orderRepo, times(1)).save(driverOrder);
-        verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
+        verify(eventPublisher, times(1)).publishOrderUpdated(any());
     }
 
     @Test
@@ -311,9 +311,7 @@ public class OrderServiceTest {
 
         orderService.confirmOrder(orderId);
 
-        verify(redisTemplate, times(1)).convertAndSend(topicCaptor.capture(), eventCaptor.capture());
-
-        assertEquals("orders:updated", topicCaptor.getValue());
+        verify(eventPublisher, times(1)).publishOrderUpdated(eventCaptor.capture());
 
         DriverOrderEvent publishedEvent = eventCaptor.getValue();
         assertNotNull(publishedEvent);
@@ -382,7 +380,7 @@ public class OrderServiceTest {
         assertNotNull(res);
         assertEquals(OrderStatus.DISPATCHED, res.status());
         verify(orderRepo, times(1)).save(driverOrder);
-        verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
+        verify(eventPublisher, times(1)).publishOrderUpdated(any());
     }
     @Test
     void dispatchOrder_Success_ShouldIncreaseDriverDebtAndChangeStatus() {
@@ -400,7 +398,7 @@ public class OrderServiceTest {
 
         verify(driverService, times(1)).increaseDebt(driverId, BigDecimal.valueOf(1500));
         verify(orderRepo, times(1)).save(driverOrder);
-        verify(redisTemplate, times(1)).convertAndSend(eq("orders:updated"), any());
+        verify(eventPublisher, times(1)).publishOrderUpdated(any());
     }
     @Test
     void markDispatched_WhenStatusNotConfirmed_ShouldThrowIllegalStateException() {
