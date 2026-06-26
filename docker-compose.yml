@@ -1,4 +1,27 @@
+version: '3.8'
+
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: drivers-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - DB_URL=jdbc:postgresql://postgres-db:5432/drivers_db
+      - DB_USERNAME=postgres
+      - DB_PASSWORD=secret
+      - REDIS_HOST=redis-cache
+      - REDIS_PORT=6379
+      - JWT_SECRET=g2S9x1nZb6VQ3p7tM8cJ5r2U1wY4l9NkQ0rTeHwXaEo
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+      redis-cache:
+        condition: service_started
+
   postgres-db:
     image: postgres:15-alpine
     container_name: drivers-postgres
@@ -10,6 +33,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d drivers_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis-cache:
     image: redis:7-alpine
