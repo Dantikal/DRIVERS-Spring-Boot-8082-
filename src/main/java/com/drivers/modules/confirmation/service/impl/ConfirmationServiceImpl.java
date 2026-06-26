@@ -7,7 +7,7 @@ import com.drivers.modules.orders.repository.DriverOrderRepo;
 import com.drivers.shared.exception.ex.OrderNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
@@ -20,9 +20,7 @@ import java.util.UUID;
 public class ConfirmationServiceImpl implements ConfirmationService {
 
     private final DriverOrderRepo orderRepo;
-    private final RedisTemplate<String, Object> redisTemplate;
-
-    private static final String TOPIC_ORDERS_UPDATED = "orders:updated";
+    private final DriverEventPublisher eventPublisher;
 
     @Override
     public void confirmationReceipt(UUID dispatchId, UUID driverId) {
@@ -35,20 +33,15 @@ public class ConfirmationServiceImpl implements ConfirmationService {
 
         log.info("Водитель {} подтвердил получение заказа {}", driverId, dispatchId);
 
-        try {
-            DriverOrderEvent event = DriverOrderEvent.builder()
-                    .orderId(order.getId())
-                    .driverId(order.getDriverId())
-                    .warehouseId(order.getWarehouseId())
-                    .status(order.getStatus())
-                    .totalAmount(order.getTotalAmount())
-                    .eventType("RECEIPT_CONFIRMED")
-                    .timestamp(LocalDateTime.now().toString())
-                    .build();
-            redisTemplate.convertAndSend(TOPIC_ORDERS_UPDATED, event);
-            log.info("Redis event 'RECEIPT_CONFIRMED' → topic '{}' for order {}", TOPIC_ORDERS_UPDATED, order.getId());
-        } catch (Exception e) {
-            log.error("Не удалось опубликовать событие в Redis для подтверждения заказа {}: {}", order.getId(), e.getMessage());
-        }
+        DriverOrderEvent event = DriverOrderEvent.builder()
+                .orderId(order.getId())
+                .driverId(order.getDriverId())
+                .warehouseId(order.getWarehouseId())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .eventType("RECEIPT_CONFIRMED")
+                .timestamp(LocalDateTime.now().toString())
+                .build();
+        eventPublisher.publishOrderUpdated(event);
     }
 }

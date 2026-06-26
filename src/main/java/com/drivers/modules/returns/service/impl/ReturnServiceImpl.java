@@ -22,7 +22,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,7 +47,7 @@ public class ReturnServiceImpl implements ReturnService {
     private final ReturnRequestRepo returnRequestRepo;
     private final DriverService driverService;
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final DriverEventPublisher eventPublisher;
 
     @Value("${drivers.uploads.returns-dir:uploads/returns}")
     private String returnsUploadDir;
@@ -192,31 +192,26 @@ public class ReturnServiceImpl implements ReturnService {
     }
 
     private void publishReturnEvent(ReturnRequest returnRequest, String eventType) {
-        try {
-            List<ReturnEvent.ReturnItemEvent> itemEvents = returnRequest.getItems().stream()
-                    .map(item -> ReturnEvent.ReturnItemEvent.builder()
-                            .productId(item.getProductId())
-                            .qtyBoxes(item.getQtyBoxes())
-                            .qtyPieces(item.getQtyPieces())
-                            .reason(item.getReason())
-                            .build())
-                    .toList();
+        List<ReturnEvent.ReturnItemEvent> itemEvents = returnRequest.getItems().stream()
+                .map(item -> ReturnEvent.ReturnItemEvent.builder()
+                        .productId(item.getProductId())
+                        .qtyBoxes(item.getQtyBoxes())
+                        .qtyPieces(item.getQtyPieces())
+                        .reason(item.getReason())
+                        .build())
+                .toList();
 
-            ReturnEvent event = ReturnEvent.builder()
-                    .returnId(returnRequest.getId())
-                    .driverId(returnRequest.getDriverId())
-                    .status(returnRequest.getStatus())
-                    .totalAmount(returnRequest.getTotalAmount())
-                    .eventType(eventType)
-                    .timestamp(LocalDateTime.now().toString())
-                    .items(itemEvents)
-                    .build();
+        ReturnEvent event = ReturnEvent.builder()
+                .returnId(returnRequest.getId())
+                .driverId(returnRequest.getDriverId())
+                .status(returnRequest.getStatus())
+                .totalAmount(returnRequest.getTotalAmount())
+                .eventType(eventType)
+                .timestamp(LocalDateTime.now().toString())
+                .items(itemEvents)
+                .build();
 
-            redisTemplate.convertAndSend("returns:processed", event);
-            log.info("Опубликовано событие {} для возврата {}", event.eventType(), returnRequest.getId());
-        } catch (Exception e) {
-            log.error("Не удалось опубликовать событие возврата {}: {}", returnRequest.getId(), e.getMessage());
-        }
+        eventPublisher.publishReturnProcessed(event);
     }
 
 

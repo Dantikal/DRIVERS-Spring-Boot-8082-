@@ -22,7 +22,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +43,7 @@ public class OrderServiceImpl implements OrderService {
 
     private final DriverOrderRepo orderRepo;
     private final DriverService driverService;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final DriverEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -272,20 +272,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     private void publishOrderEvent(DriverOrder order, String eventType, String topic) {
-        try {
-            DriverOrderEvent event = DriverOrderEvent.builder()
-                    .orderId(order.getId())
-                    .driverId(order.getDriverId())
-                    .warehouseId(order.getWarehouseId())
-                    .status(order.getStatus())
-                    .totalAmount(order.getTotalAmount())
-                    .eventType(eventType)
-                    .timestamp(LocalDateTime.now().toString())
-                    .build();
-            redisTemplate.convertAndSend(topic, event);
-            log.info("Redis event '{}' → topic '{}' for order {}", eventType, topic, order.getId());
-        } catch (Exception e) {
-            log.error("Не удалось опубликовать событие в Redis для заявки {}: {}", order.getId(), e.getMessage());
+        DriverOrderEvent event = DriverOrderEvent.builder()
+                .orderId(order.getId())
+                .driverId(order.getDriverId())
+                .warehouseId(order.getWarehouseId())
+                .status(order.getStatus())
+                .totalAmount(order.getTotalAmount())
+                .eventType(eventType)
+                .timestamp(LocalDateTime.now().toString())
+                .build();
+        if (TOPIC_ORDERS_NEW.equals(topic)) {
+            eventPublisher.publishOrderNew(event);
+        } else {
+            eventPublisher.publishOrderUpdated(event);
         }
     }
 }

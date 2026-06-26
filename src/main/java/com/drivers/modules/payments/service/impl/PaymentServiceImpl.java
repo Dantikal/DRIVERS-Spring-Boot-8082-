@@ -18,7 +18,7 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,7 +37,7 @@ public class PaymentServiceImpl implements PaymentService {
 
     private final DriverPaymentRepo paymentRepo;
     private final DriverService driverService;
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final DriverEventPublisher eventPublisher;
 
     @Override
     @Transactional(readOnly = true)
@@ -94,23 +94,16 @@ public class PaymentServiceImpl implements PaymentService {
     }
 
     private void publishPaymentReceivedEvent(DriverPayment payment) {
-        try {
-            PaymentEvent event = PaymentEvent.builder()
-                    .paymentId(payment.getId())
-                    .driverId(payment.getDriverId())
-                    .amount(payment.getAmount())
-                    .method(payment.getPaymentMethod())
-                    .eventType("PAYMENT_RECEIVED")
-                    .timestamp(Instant.now().toString())
-                    .build();
+        PaymentEvent event = PaymentEvent.builder()
+                .paymentId(payment.getId())
+                .driverId(payment.getDriverId())
+                .amount(payment.getAmount())
+                .method(payment.getPaymentMethod())
+                .eventType("PAYMENT_RECEIVED")
+                .timestamp(Instant.now().toString())
+                .build();
 
-            redisTemplate.convertAndSend(TOPIC_PAYMENTS_RECEIVED, event);
-            log.info("Published payment received event to topic '{}' for payment {}",
-                    TOPIC_PAYMENTS_RECEIVED, payment.getId());
-
-        } catch (Exception e) {
-            log.error("Couldn't publish payment event: {}: {}", payment.getId(), e.getMessage());
-        }
+        eventPublisher.publishPaymentReceived(event);
     }
 
     @Override

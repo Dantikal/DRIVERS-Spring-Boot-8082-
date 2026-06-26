@@ -10,7 +10,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.RedisTemplate;
+import com.drivers.modules.events.publisher.DriverEventPublisher;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.math.BigDecimal;
@@ -29,7 +29,7 @@ class ConfirmationServiceImplTest {
     private DriverOrderRepo orderRepo;
 
     @Mock
-    private RedisTemplate<String, Object> redisTemplate;
+    private DriverEventPublisher eventPublisher;
 
     @InjectMocks
     private ConfirmationServiceImpl confirmationService;
@@ -49,7 +49,7 @@ class ConfirmationServiceImplTest {
         confirmationService.confirmationReceipt(dispatchId, driverId);
 
         verify(orderRepo).findById(dispatchId);
-        verify(redisTemplate).convertAndSend(eq("orders:updated"), any(DriverOrderEvent.class));
+        verify(eventPublisher).publishOrderUpdated(any(DriverOrderEvent.class));
     }
 
     @Test
@@ -63,7 +63,7 @@ class ConfirmationServiceImplTest {
             confirmationService.confirmationReceipt(dispatchId, driverId)
         );
 
-        verify(redisTemplate, never()).convertAndSend(anyString(), any());
+        verify(eventPublisher, never()).publishOrderUpdated(any());
     }
 
     @Test
@@ -82,6 +82,6 @@ class ConfirmationServiceImplTest {
             confirmationService.confirmationReceipt(dispatchId, driverId)
         );
 
-        verify(redisTemplate, never()).convertAndSend(anyString(), any());
+        verify(eventPublisher, never()).publishOrderUpdated(any());
     }
 }
