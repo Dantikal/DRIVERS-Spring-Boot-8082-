@@ -34,6 +34,7 @@ public class SecurityConfig {
                                 "/swagger-ui.html"
                         ).permitAll()
                         .requestMatchers("/api/drivers/auth/**", "/ws/**").permitAll()
+                        .requestMatchers(org.springframework.http.HttpMethod.POST, "/api/drivers").permitAll()
 
                         .anyRequest().authenticated()
                 )
