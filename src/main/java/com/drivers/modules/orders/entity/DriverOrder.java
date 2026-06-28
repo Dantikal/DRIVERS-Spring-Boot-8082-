@@ -37,7 +37,7 @@ public class DriverOrder extends BaseEntity {
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true, length = 50)
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 255)
     private String idempotencyKey;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)

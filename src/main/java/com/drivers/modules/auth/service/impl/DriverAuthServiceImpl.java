@@ -15,6 +15,7 @@ import com.drivers.shared.exception.ex.DriverNotFoundException;
 import com.drivers.shared.exception.ex.InvalidCredentialsException;
 import com.drivers.shared.util.CustomUserDetailsService;
 import com.drivers.shared.util.JwtUtil;
+import io.jsonwebtoken.ExpiredJwtException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -143,8 +144,11 @@ public class DriverAuthServiceImpl implements DriverAuthService {
                         "revoked",
                         remainingTime,
                         TimeUnit.MILLISECONDS);
+                log.info("Token successfully added to blacklist. Remaining time = {}ms", remainingTime);
             }
-            log.info("Token successfully added to blacklist. Remaining time = {}ms", remainingTime);
+        } catch (ExpiredJwtException e) {
+            // Token is already expired — it cannot be used again anyway, no need to blacklist
+            log.info("Logout called with an already-expired token. Treating as successful logout.");
         } catch (Exception e) {
             log.warn("Failed to add token to blacklist: {}", e.getMessage());
         }

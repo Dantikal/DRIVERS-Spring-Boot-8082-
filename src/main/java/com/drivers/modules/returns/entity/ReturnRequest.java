@@ -32,7 +32,7 @@ public class ReturnRequest extends BaseEntity {
     @Column(name = "status", nullable = false)
     private ReturnStatus status;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true, length = 50)
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 255)
     private String idempotencyKey;
 
     @OneToMany(mappedBy = "returnRequest", cascade = CascadeType.ALL, orphanRemoval = true)

@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import java.util.UUID;
 
@@ -22,7 +23,7 @@ public class OfflineController {
 
     @PostMapping("/sync")
     public ResponseEntity<OfflineSyncResponse> sync(
-            @RequestBody OfflineSyncRequest request,
+            @Valid @RequestBody OfflineSyncRequest request,
             @CurrentDriverId UUID driverId) {
         
         OfflineSyncResponse response = offlineService.syncOfflineQueue(request, driverId);

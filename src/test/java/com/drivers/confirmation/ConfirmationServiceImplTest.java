@@ -2,6 +2,7 @@ package com.drivers.confirmation;
 
 import com.drivers.modules.events.dto.DriverOrderEvent;
 import com.drivers.modules.orders.entity.DriverOrder;
+import com.drivers.modules.orders.entity.OrderStatus;
 import com.drivers.modules.orders.repository.DriverOrderRepo;
 import com.drivers.modules.confirmation.service.impl.ConfirmationServiceImpl;
 import com.drivers.shared.exception.ex.OrderNotFoundException;
@@ -43,6 +44,7 @@ class ConfirmationServiceImplTest {
         mockOrder.id = dispatchId;
         mockOrder.setDriverId(driverId);
         mockOrder.setTotalAmount(BigDecimal.TEN);
+        mockOrder.setStatus(OrderStatus.DISPATCHED);
 
         when(orderRepo.findById(dispatchId)).thenReturn(Optional.of(mockOrder));
 

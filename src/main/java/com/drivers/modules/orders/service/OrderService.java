@@ -5,20 +5,19 @@ import com.drivers.modules.orders.dto.req.OrderCreateReq;
 import com.drivers.modules.orders.dto.req.OrderModifyReq;
 import com.drivers.modules.orders.dto.req.OrderRejectReq;
 import com.drivers.modules.orders.entity.OrderStatus;
+import com.drivers.shared.dto.IdempotentResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
 public interface OrderService {
     Page<OrderDto> getOrders(Pageable pageable, UUID driverId, OrderStatus status);
-    OrderDto createOrder(OrderCreateReq req, UUID id, String idempotencyKey);
+    IdempotentResponse<OrderDto> createOrder(OrderCreateReq req, UUID id, String idempotencyKey);
     OrderDto getOrder(UUID id, UUID driverId);
     OrderDto getOrder(UUID id);
     OrderDto confirmOrder(UUID id);
     OrderDto modifyOrder(UUID id, OrderModifyReq req);
     OrderDto rejectOrder(UUID id, OrderRejectReq req);
     OrderDto markDispatched(UUID id);
-    boolean checkIfThisOrderWasAlreadyCreated(OrderDto res);
 }

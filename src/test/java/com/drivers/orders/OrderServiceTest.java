@@ -12,7 +12,9 @@ import com.drivers.modules.orders.entity.DriverOrderItem;
 import com.drivers.modules.orders.entity.OrderStatus;
 import com.drivers.modules.orders.repository.DriverOrderRepo;
 import com.drivers.modules.orders.service.impl.OrderServiceImpl;
+import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.exception.ex.OrderNotFoundException;
+import com.drivers.shared.idempotency.IdempotencyHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -52,6 +54,9 @@ public class OrderServiceTest {
 
     @Mock
     private DriverEventPublisher eventPublisher;
+
+    @Mock
+    private IdempotencyHelper idempotencyHelper;
 
     @InjectMocks
     private OrderServiceImpl orderService;
@@ -97,19 +102,20 @@ public class OrderServiceTest {
         OrderCreateReq req = new OrderCreateReq(warehouseId, BigDecimal.valueOf(1500), "Test comment", List.of(itemReq));
         String idempotencyKey = UUID.randomUUID().toString();
 
-        when(orderRepo.saveAndFlush(any(DriverOrder.class))).thenReturn(driverOrder);
+        when(idempotencyHelper.saveOrder(any(DriverOrder.class))).thenReturn(driverOrder);
 
         // Act
-        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+        IdempotentResponse<OrderDto> res = orderService.createOrder(req, driverId, idempotencyKey);
 
         // Assert
         assertNotNull(res);
-        assertEquals(orderId, res.id());
-        assertEquals(OrderStatus.NEW, res.status());
-        assertEquals(driverId, res.driverId());
+        assertFalse(res.isReplayed());
+        assertEquals(orderId, res.data().id());
+        assertEquals(OrderStatus.NEW, res.data().status());
+        assertEquals(driverId, res.data().driverId());
 
         verify(driverService, times(1)).getDriver(driverId);
-        verify(orderRepo, times(1)).saveAndFlush(any(DriverOrder.class));
+        verify(idempotencyHelper, times(1)).saveOrder(any(DriverOrder.class));
         verify(eventPublisher, times(1)).publishOrderNew(any());
     }
 
@@ -421,9 +427,10 @@ public class OrderServiceTest {
 
         when(orderRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.of(driverOrder));
 
-        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+        IdempotentResponse<OrderDto> res = orderService.createOrder(req, driverId, idempotencyKey);
 
         assertNotNull(res);
+        assertTrue(res.isReplayed());
         verify(orderRepo, never()).saveAndFlush(any());
     }
 
@@ -436,14 +443,15 @@ public class OrderServiceTest {
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(driverOrder));
 
-        when(orderRepo.saveAndFlush(any(DriverOrder.class)))
+        when(idempotencyHelper.saveOrder(any(DriverOrder.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
-        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+        IdempotentResponse<OrderDto> res = orderService.createOrder(req, driverId, idempotencyKey);
 
         assertNotNull(res);
-        assertEquals(driverOrder.getId(), res.id());
-        verify(orderRepo, times(1)).saveAndFlush(any(DriverOrder.class));
+        assertTrue(res.isReplayed());
+        assertEquals(driverOrder.getId(), res.data().id());
+        verify(idempotencyHelper, times(1)).saveOrder(any(DriverOrder.class));
         verify(orderRepo, times(2)).findByIdempotencyKey(idempotencyKey);
     }
 }

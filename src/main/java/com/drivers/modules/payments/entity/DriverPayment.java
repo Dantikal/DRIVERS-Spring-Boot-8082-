@@ -26,7 +26,7 @@ public class DriverPayment extends BaseEntity {
     @Column(name = "payment_method", nullable = false)
     private PaymentMethod paymentMethod;
 
-    @Column(name = "idempotency_key", nullable = false, unique = true, length = 50)
+    @Column(name = "idempotency_key", nullable = false, unique = true, length = 255)
     private String idempotencyKey;
 
     @Column(name = "comment", columnDefinition = "TEXT")

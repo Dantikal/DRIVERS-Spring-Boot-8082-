@@ -19,6 +19,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.drivers.modules.events.publisher.DriverEventPublisher;
+import com.drivers.shared.idempotency.IdempotencyHelper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,6 +39,7 @@ public class PaymentServiceImpl implements PaymentService {
     private final DriverPaymentRepo paymentRepo;
     private final DriverService driverService;
     private final DriverEventPublisher eventPublisher;
+    private final IdempotencyHelper idempotencyHelper;
 
     @Override
     @Transactional(readOnly = true)
@@ -77,7 +79,7 @@ public class PaymentServiceImpl implements PaymentService {
 
         try {
             driverService.decreaseDebt(req.driverId(), req.amount());
-            DriverPayment saved = paymentRepo.saveAndFlush(payment); // Используем flush для немедленной проверки констрейнтов БД
+            DriverPayment saved = idempotencyHelper.savePayment(payment);
 
             log.info("Created payment {} for driver {}", saved.getId(), saved.getDriverId());
             publishPaymentReceivedEvent(saved);

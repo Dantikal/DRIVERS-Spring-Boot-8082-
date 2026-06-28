@@ -12,6 +12,7 @@ import com.drivers.modules.returns.repository.ReturnRequestRepo;
 import com.drivers.modules.returns.service.impl.ReturnServiceImpl;
 import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.exception.ex.ReturnNotFoundException;
+import com.drivers.shared.idempotency.IdempotencyHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -55,6 +56,9 @@ public class ReturnServiceTest {
     @Mock
     private DriverEventPublisher eventPublisher;
 
+    @Mock
+    private IdempotencyHelper idempotencyHelper;
+
     @InjectMocks
     private ReturnServiceImpl returnService;
 
@@ -91,14 +95,14 @@ public class ReturnServiceTest {
     @Test
     void createReturn_Success_ShouldReturnNew() {
         when(returnRequestRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
-        when(returnRequestRepo.saveAndFlush(any(ReturnRequest.class))).thenReturn(returnRequest);
+        when(idempotencyHelper.saveReturn(any(ReturnRequest.class))).thenReturn(returnRequest);
 
         IdempotentResponse<ReturnRequestDto> res = returnService.createReturn(createReq, driverId, idempotencyKey);
 
         assertNotNull(res);
         assertFalse(res.isReplayed());
         assertEquals(ReturnStatus.PENDING, res.data().status());
-        verify(returnRequestRepo, times(1)).saveAndFlush(any(ReturnRequest.class));
+        verify(idempotencyHelper, times(1)).saveReturn(any(ReturnRequest.class));
         verify(eventPublisher, times(1)).publishReturnProcessed(any());
     }
 
@@ -119,7 +123,7 @@ public class ReturnServiceTest {
         when(returnRequestRepo.findByIdempotencyKey(idempotencyKey))
                 .thenReturn(Optional.empty())
                 .thenReturn(Optional.of(returnRequest));
-        when(returnRequestRepo.saveAndFlush(any(ReturnRequest.class)))
+        when(idempotencyHelper.saveReturn(any(ReturnRequest.class)))
                 .thenThrow(new DataIntegrityViolationException("Unique index violation"));
 
         IdempotentResponse<ReturnRequestDto> res = returnService.createReturn(createReq, driverId, idempotencyKey);

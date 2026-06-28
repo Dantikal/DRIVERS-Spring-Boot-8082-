@@ -70,9 +70,7 @@ public class DispatchCreatedListener implements MessageListener {
         order.setStatus(OrderStatus.DISPATCHED);
         orderRepo.save(order);
 
-        driverService.increaseDebt(order.getDriverId(), order.getTotalAmount());
-
-        log.info("DispatchCreatedListener: order {} marked DISPATCHED, debt increased for driver {} by {}",
-                orderId, order.getDriverId(), order.getTotalAmount());
+        log.info("DispatchCreatedListener: order {} marked DISPATCHED",
+                orderId);
     }
 }

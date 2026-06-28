@@ -7,6 +7,7 @@ import com.drivers.modules.orders.dto.req.OrderCreateReq;
 import com.drivers.modules.orders.dto.req.OrderItemReq;
 import com.drivers.modules.orders.entity.OrderStatus;
 import com.drivers.modules.orders.service.OrderService;
+import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.util.CurrentDriverId;
 import com.drivers.shared.util.CustomUserDetailsService;
 import com.drivers.shared.util.JwtUtil;
@@ -192,7 +193,7 @@ public class DriverOrderSelfControllerTest {
         String idempotencyKey = UUID.randomUUID().toString();
 
         when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID), eq(idempotencyKey)))
-                .thenReturn(orderDto);
+                .thenReturn(new IdempotentResponse<>(orderDto, false));
 
         mockMvc.perform(post("/api/drivers/me/orders")
                         .with(csrf())
@@ -223,7 +224,7 @@ public class DriverOrderSelfControllerTest {
                 .build();
 
         when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID), eq(idempotencyKey)))
-                .thenReturn(freshDto);
+                .thenReturn(new IdempotentResponse<>(freshDto, false));
 
         mockMvc.perform(post("/api/drivers/me/orders")
                         .with(csrf())
@@ -256,17 +257,14 @@ public class DriverOrderSelfControllerTest {
 
 
         when(orderService.createOrder(any(OrderCreateReq.class), eq(STUB_DRIVER_ID), eq(idempotencyKey)))
-                .thenReturn(replayedDto);
-
-        when(orderService.checkIfThisOrderWasAlreadyCreated(any(OrderDto.class)))
-                .thenReturn(true);
+                .thenReturn(new IdempotentResponse<>(replayedDto, true));
 
         mockMvc.perform(post("/api/drivers/me/orders")
                         .with(csrf())
                         .header("Idempotency-Key", idempotencyKey)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isCreated())
+                .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(orderId.toString()))
                 .andExpect(header().string("Idempotency-Replayed", "true"));
     }

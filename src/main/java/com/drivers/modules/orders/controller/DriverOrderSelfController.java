@@ -4,6 +4,7 @@ import com.drivers.modules.orders.dto.OrderDto;
 import com.drivers.modules.orders.dto.req.OrderCreateReq;
 import com.drivers.modules.orders.entity.OrderStatus;
 import com.drivers.modules.orders.service.OrderService;
+import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.util.CurrentDriverId;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -36,14 +37,14 @@ public class DriverOrderSelfController {
                                       @CurrentDriverId UUID driverId,
                                       @Parameter(in = ParameterIn.HEADER, name = "Idempotency-Key", description = "Idempotency-Key to prevent duplicates")
                                 @RequestHeader(name = "Idempotency-Key") String idempotencyKey) {
-        OrderDto res = orderService.createOrder(req, driverId, idempotencyKey);
+        IdempotentResponse<OrderDto> response = orderService.createOrder(req, driverId, idempotencyKey);
 
-        if(orderService.checkIfThisOrderWasAlreadyCreated(res)){
-            return ResponseEntity.status(HttpStatus.CREATED)
+        if (response.isReplayed()) {
+            return ResponseEntity.status(HttpStatus.OK)
                     .header("Idempotency-Replayed", "true")
-                    .body(res);
+                    .body(response.data());
         }
-        return ResponseEntity.status(HttpStatus.CREATED).body(res);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response.data());
     }
 
     @GetMapping()

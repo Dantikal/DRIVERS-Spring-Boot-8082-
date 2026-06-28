@@ -18,6 +18,7 @@ import com.drivers.modules.drivers.service.DriverService;
 import com.drivers.shared.exception.ex.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -50,12 +51,6 @@ public class DriverServiceImpl implements DriverService {
     @Override
     @Transactional
     public DriverDto createDriver(DriverCreateReq driverCreateReq) {
-        if(driverRepository.existsByPhone(driverCreateReq.phone())){
-            throw new PhoneAlreadyExistsException("Номер телефона уже зарегистрирован");
-        }
-        if(driverRepository.existsByCarNumber(driverCreateReq.carNumber())){
-            throw new CarNumberAlreadyExistsException("Номер автомобиля уже зарегистрирован");
-        }
         Driver driverObject = Driver.builder()
                 .fullName(driverCreateReq.fullName())
                 .phone(driverCreateReq.phone())
@@ -63,22 +58,33 @@ public class DriverServiceImpl implements DriverService {
                 .warehouseId(driverCreateReq.warehouseId())
                 .status(DriverStatus.ACTIVE)
                 .build();
-        Driver driver = driverRepository.save(driverObject);
-        DriverAuth driverAuth = DriverAuth.builder()
-                .phone(driverCreateReq.phone())
-                .password(passwordEncoder.encode(driverCreateReq.password()))
-                .driverId(driver.getId())
-                .build();
-        DriverDebt driverDebt = DriverDebt.builder()
-                .driverId(driver.getId())
-                .totalDebt(BigDecimal.ZERO)
-                .build();
-        driverAuthRepository.save(driverAuth);
-        driverDebtRepository.save(driverDebt);
+        try {
+            Driver driver = driverRepository.saveAndFlush(driverObject);
+            DriverAuth driverAuth = DriverAuth.builder()
+                    .phone(driverCreateReq.phone())
+                    .password(passwordEncoder.encode(driverCreateReq.password()))
+                    .driverId(driver.getId())
+                    .build();
+            DriverDebt driverDebt = DriverDebt.builder()
+                    .driverId(driver.getId())
+                    .totalDebt(BigDecimal.ZERO)
+                    .build();
+            driverAuthRepository.save(driverAuth);
+            driverDebtRepository.save(driverDebt);
 
-        log.info("Initialized driver with id {} and set zero as his debt", driver.getId());
+            log.info("Initialized driver with id {} and set zero as his debt", driver.getId());
+            return driverMapper.toDto(driver);
 
-        return driverMapper.toDto(driver);
+        } catch (DataIntegrityViolationException e) {
+            String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
+            if (msg.contains("phone")) {
+                throw new PhoneAlreadyExistsException("Номер телефона уже зарегистрирован");
+            }
+            if (msg.contains("car_number") || msg.contains("carnumber")) {
+                throw new CarNumberAlreadyExistsException("Номер автомобиля уже зарегистрирован");
+            }
+            throw e; // re-throw if it's a different constraint
+        }
     }
 
     @Override

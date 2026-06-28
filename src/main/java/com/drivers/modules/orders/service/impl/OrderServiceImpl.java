@@ -23,6 +23,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.drivers.modules.events.publisher.DriverEventPublisher;
+import com.drivers.shared.dto.IdempotentResponse;
+import com.drivers.shared.idempotency.IdempotencyHelper;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +46,7 @@ public class OrderServiceImpl implements OrderService {
     private final DriverOrderRepo orderRepo;
     private final DriverService driverService;
     private final DriverEventPublisher eventPublisher;
+    private final IdempotencyHelper idempotencyHelper;
 
     @Override
     @Transactional(readOnly = true)
@@ -63,11 +66,11 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
-    public OrderDto createOrder(OrderCreateReq req, UUID driverId, String idempotencyKey) {
+    public IdempotentResponse<OrderDto> createOrder(OrderCreateReq req, UUID driverId, String idempotencyKey) {
         Optional<DriverOrder> optionalOrder = orderRepo.findByIdempotencyKey(idempotencyKey);
-        if(optionalOrder.isPresent()){
+        if (optionalOrder.isPresent()) {
             log.info("Idempotency hit: Returning existing order {}", optionalOrder.get().getId());
-            return toDto(optionalOrder.get());
+            return new IdempotentResponse<>(toDto(optionalOrder.get()), true);
         }
 
         driverService.getDriver(driverId);
@@ -86,24 +89,17 @@ public class OrderServiceImpl implements OrderService {
         req.items().forEach(itemReq -> order.getItems().add(toEntity(itemReq, order)));
 
         try {
-            DriverOrder saved = orderRepo.saveAndFlush(order);
+            DriverOrder saved = idempotencyHelper.saveOrder(order);
             publishOrderEvent(saved, "ORDER_CREATED", TOPIC_ORDERS_NEW);
             log.info("Created new order: {} for driver: {}", saved.getId(), saved.getDriverId());
-            return toDto(saved);
+            return new IdempotentResponse<>(toDto(saved), false);
 
         } catch (DataIntegrityViolationException e) {
             log.warn("Concurrency hit for idempotency key {}. Fetching order saved by another thread.", idempotencyKey);
             DriverOrder racedOrder = orderRepo.findByIdempotencyKey(idempotencyKey)
                     .orElseThrow(() -> new RuntimeException("Неожиданная ошибка параллельного выполнения"));
-            return toDto(racedOrder);
+            return new IdempotentResponse<>(toDto(racedOrder), true);
         }
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public boolean checkIfThisOrderWasAlreadyCreated(OrderDto result) {
-        return result.createdAt() != null
-                && result.createdAt().isBefore(Instant.now().minusSeconds(2));
     }
 
     @Override

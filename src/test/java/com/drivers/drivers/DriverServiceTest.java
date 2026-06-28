@@ -30,6 +30,7 @@ import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.time.Instant;
@@ -134,12 +135,10 @@ public class DriverServiceTest {
                 .warehouseId(warehouseId)
                 .build();
 
-        when(driverRepository.save(any(Driver.class))).thenReturn(driver);
+        when(driverRepository.saveAndFlush(any(Driver.class))).thenReturn(driver);
         when(driverAuthRepository.save(any(DriverAuth.class))).thenReturn(driverAuth);
         when(driverDebtRepository.save(any(DriverDebt.class))).thenReturn(driverDebt);
         when(driverMapper.toDto(driver)).thenReturn(driverDto);
-        when(driverRepository.existsByPhone(any(String.class))).thenReturn(false);
-        when(driverRepository.existsByCarNumber(any(String.class))).thenReturn(false);
         when(passwordEncoder.encode(any(String.class))).thenReturn(password);
 
 
@@ -148,7 +147,7 @@ public class DriverServiceTest {
         assertNotNull(res);
         assertEquals(res, driverDto);
 
-        verify(driverRepository, times(1)).save(any(Driver.class));
+        verify(driverRepository, times(1)).saveAndFlush(any(Driver.class));
         verify(driverAuthRepository, times(1)).save(any(DriverAuth.class));
         verify(driverDebtRepository, times(1)).save(any(DriverDebt.class));
     }
@@ -162,12 +161,11 @@ public class DriverServiceTest {
                 .carNumber(carNumber)
                 .warehouseId(warehouseId)
                 .build();
-        when(driverRepository.existsByPhone(phone)).thenReturn(true);
+        when(driverRepository.saveAndFlush(any(Driver.class)))
+                .thenThrow(new DataIntegrityViolationException("unique constraint on phone"));
 
         assertThrows(PhoneAlreadyExistsException.class, () -> driverService.createDriver(req));
-
-        verify(driverRepository, times(1)).existsByPhone(phone);
-        verify(driverRepository, never()).save(any(Driver.class));
+        verify(driverRepository, times(1)).saveAndFlush(any(Driver.class));
     }
 
     @Test
@@ -179,12 +177,11 @@ public class DriverServiceTest {
                 .carNumber(carNumber)
                 .warehouseId(warehouseId)
                 .build();
-        when(driverRepository.existsByCarNumber(carNumber)).thenReturn(true);
+        when(driverRepository.saveAndFlush(any(Driver.class)))
+                .thenThrow(new DataIntegrityViolationException("unique constraint on car_number"));
 
         assertThrows(CarNumberAlreadyExistsException.class, () -> driverService.createDriver(req));
-
-        verify(driverRepository, times(1)).existsByCarNumber(carNumber);
-        verify(driverRepository, never()).save(any(Driver.class));
+        verify(driverRepository, times(1)).saveAndFlush(any(Driver.class));
     }
 
     @Test

@@ -23,6 +23,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import com.drivers.modules.events.publisher.DriverEventPublisher;
+import com.drivers.shared.idempotency.IdempotencyHelper;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,8 +47,8 @@ public class ReturnServiceImpl implements ReturnService {
 
     private final ReturnRequestRepo returnRequestRepo;
     private final DriverService driverService;
-
     private final DriverEventPublisher eventPublisher;
+    private final IdempotencyHelper idempotencyHelper;
 
     @Value("${drivers.uploads.returns-dir:uploads/returns}")
     private String returnsUploadDir;
@@ -90,7 +91,7 @@ public class ReturnServiceImpl implements ReturnService {
         req.items().forEach(item -> returnRequest.getItems().add(toEntity(item, returnRequest)));
 
         try {
-            ReturnRequest saved = returnRequestRepo.saveAndFlush(returnRequest);
+            ReturnRequest saved = idempotencyHelper.saveReturn(returnRequest);
             publishReturnEvent(saved, "RETURN_CREATED");
             log.info("Created return {} for driver {}", saved.getId(), saved.getDriverId());
 

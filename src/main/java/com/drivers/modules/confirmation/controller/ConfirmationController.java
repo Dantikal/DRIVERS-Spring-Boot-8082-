@@ -4,6 +4,7 @@ import com.drivers.modules.confirmation.service.ConfirmationService;
 import com.drivers.shared.util.CurrentDriverId;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -14,6 +15,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/drivers/dispatch")
 @RequiredArgsConstructor
+@PreAuthorize("hasRole('DRIVER')")
 public class ConfirmationController {
 
     private final ConfirmationService confirmationService;

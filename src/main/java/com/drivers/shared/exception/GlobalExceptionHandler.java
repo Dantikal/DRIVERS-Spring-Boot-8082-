@@ -91,9 +91,9 @@ public class GlobalExceptionHandler {
     }
 
     @ExceptionHandler(InvalidCredentialsException.class)
-    public ResponseEntity<ErrorResponse> handleInvalidCredentials(String message) {
+    public ResponseEntity<ErrorResponse> handleInvalidCredentials(InvalidCredentialsException ex) {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                .body(buildError("invalid_credentials", message, null));
+                .body(buildError("invalid_credentials", ex.getMessage(), null));
     }
 
     @ExceptionHandler(InsufficientAuthenticationException.class)
@@ -153,13 +153,13 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(PhoneAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handlePhoneAlreadyExists(PhoneAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(buildError("phone_already_exists", ex.getMessage(), null));
     }
 
     @ExceptionHandler(CarNumberAlreadyExistsException.class)
     public ResponseEntity<ErrorResponse> handleCarNumberAlreadyExists(CarNumberAlreadyExistsException ex) {
-        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(buildError("car_number_already_exists", ex.getMessage(), null));
     }
 

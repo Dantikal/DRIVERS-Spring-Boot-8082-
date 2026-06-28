@@ -10,6 +10,7 @@ import com.drivers.modules.payments.repository.DriverPaymentRepo;
 import com.drivers.modules.payments.service.impl.PaymentServiceImpl;
 import com.drivers.shared.dto.IdempotentResponse;
 import com.drivers.shared.exception.ex.PaymentNotFoundException;
+import com.drivers.shared.idempotency.IdempotencyHelper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -49,6 +50,9 @@ class PaymentsServiceTest {
     @Mock
     private DriverEventPublisher eventPublisher;
 
+    @Mock
+    private IdempotencyHelper idempotencyHelper;
+
     private UUID driverId;
     private UUID paymentId;
     private DriverPayment payment;
@@ -73,7 +77,7 @@ class PaymentsServiceTest {
                 driverId, BigDecimal.valueOf(1000), PaymentMethod.CASH, "Test", UUID.randomUUID()
         );
         String idempotencyKey = UUID.randomUUID().toString();
-        when(paymentRepo.saveAndFlush(any(DriverPayment.class))).thenReturn(payment);
+        when(idempotencyHelper.savePayment(any(DriverPayment.class))).thenReturn(payment);
 
         // Act
         IdempotentResponse<PaymentDto> result = paymentService.createPayment(req, idempotencyKey);
@@ -85,7 +89,7 @@ class PaymentsServiceTest {
 
         // Проверяем бизнес-логику
         verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
-        verify(paymentRepo, times(1)).saveAndFlush(any(DriverPayment.class));
+        verify(idempotencyHelper, times(1)).savePayment(any(DriverPayment.class));
 
         // ДОБАВЛЕНО: Проверяем, что событие улетело в Redis!
         verify(eventPublisher, times(1)).publishPaymentReceived(any());
@@ -150,7 +154,7 @@ class PaymentsServiceTest {
         String idempotencyKey = UUID.randomUUID().toString();
 
         when(paymentRepo.findByIdempotencyKey(idempotencyKey)).thenReturn(Optional.empty());
-        when(paymentRepo.saveAndFlush(any(DriverPayment.class))).thenReturn(payment);
+        when(idempotencyHelper.savePayment(any(DriverPayment.class))).thenReturn(payment);
 
         IdempotentResponse<PaymentDto> result = paymentService.createPayment(req, idempotencyKey);
 
@@ -158,7 +162,7 @@ class PaymentsServiceTest {
         assertEquals(paymentId, result.data().id());
 
         verify(driverService, times(1)).decreaseDebt(driverId, BigDecimal.valueOf(1000));
-        verify(paymentRepo, times(1)).saveAndFlush(any(DriverPayment.class));
+        verify(idempotencyHelper, times(1)).savePayment(any(DriverPayment.class));
         verify(eventPublisher, times(1)).publishPaymentReceived(any());
     }
 
