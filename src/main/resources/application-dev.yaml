@@ -3,6 +3,9 @@ spring:
     hibernate:
       ddl-auto: update
     show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
 
   datasource:
     hikari:
@@ -10,8 +13,8 @@ spring:
       minimum-idle: 2
 
 jwt:
-  expiration-time: 86400000 #24h
-  refresh-expiration-time: 2592000000 #30d
+  expiration-time: 86400000 # 24 часа
+  refresh-expiration-time: 2592000000 # 30 дней
 
 logging:
   level:

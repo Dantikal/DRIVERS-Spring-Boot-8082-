@@ -1,12 +1,7 @@
 spring:
-  springdoc:
-    api-docs:
-      enabled: false
-    swagger-ui:
-      enabled: false
   jpa:
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
 
   datasource:
@@ -17,8 +12,8 @@ spring:
       max-lifetime: 1800000
 
 jwt:
-  expiration-time: 900000 #15min
-  refresh-expiration-time: 2592000000 #30d
+  expiration-time: 900000 # 15 минут
+  refresh-expiration-time: 2592000000 # 30 дней
 
 logging:
   level:

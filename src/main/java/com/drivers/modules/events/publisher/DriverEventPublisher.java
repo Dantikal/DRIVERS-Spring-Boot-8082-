@@ -6,6 +6,7 @@ import com.drivers.modules.returns.dto.event.ReturnEvent;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,6 +15,7 @@ import org.springframework.stereotype.Component;
 public class DriverEventPublisher {
 
     private final RedisTemplate<String, Object> redisTemplate;
+    private final SimpMessagingTemplate messagingTemplate;
 
     private static final String TOPIC_ORDERS_NEW      = "orders:new";
     private static final String TOPIC_ORDERS_UPDATED  = "orders:updated";
@@ -39,7 +41,8 @@ public class DriverEventPublisher {
     private void publish(String topic, Object event, String label) {
         try {
             redisTemplate.convertAndSend(topic, event);
-            log.info("DriverEventPublisher: published {} → topic '{}'", label, topic);
+            messagingTemplate.convertAndSend("/topic/" + topic.replace(":", "/"), event);
+            log.info("DriverEventPublisher: published {} → topic '{}' and WS '/topic/{}'", label, topic, topic.replace(":", "/"));
         } catch (Exception e) {
             log.error("DriverEventPublisher: failed to publish {} → topic '{}': {}",
                     label, topic, e.getMessage(), e);
