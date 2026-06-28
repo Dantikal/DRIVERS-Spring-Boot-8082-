@@ -1,0 +1,478 @@
+databaseChangeLog:
+- changeSet:
+    id: 1782641351524-1
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: driver_payments_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: amount
+            type: numeric(12, 2)
+        - column:
+            name: comment
+            type: TEXT
+        - column:
+            constraints:
+              nullable: false
+            name: driver_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: paid_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: payment_method
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: received_by
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: idempotency_key
+            type: VARCHAR(50)
+        tableName: driver_payments
+- changeSet:
+    id: 1782641351524-2
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: driver_debts_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: driver_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: total_debt
+            type: numeric(14, 2)
+        tableName: driver_debts
+- changeSet:
+    id: 1782641351524-3
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: driver_auth_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: driver_id
+            type: UUID
+        - column:
+            name: last_login
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: password
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: phone
+            type: VARCHAR(20)
+        tableName: driver_auth
+- changeSet:
+    id: 1782641351524-4
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: return_requests_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: driver_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: returned_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: status
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: total_amount
+            type: numeric(12, 2)
+        - column:
+            constraints:
+              nullable: false
+            name: idempotency_key
+            type: VARCHAR(50)
+        tableName: return_requests
+- changeSet:
+    id: 1782641351524-5
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: driver_orders_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: comment
+            type: TEXT
+        - column:
+            constraints:
+              nullable: false
+            name: driver_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: requested_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: status
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: total_amount
+            type: numeric(12, 2)
+        - column:
+            constraints:
+              nullable: false
+            name: warehouse_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: idempotency_key
+            type: VARCHAR(50)
+        tableName: driver_orders
+- changeSet:
+    id: 1782641351524-6
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: idempotency_key
+        constraintName: uk832qdyrhtk5flt3lewgixn6jw
+        tableName: driver_payments
+- changeSet:
+    id: 1782641351524-7
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: driver_id
+        constraintName: uk8r424tdlc3ewiju1d0riphm1r
+        tableName: driver_debts
+- changeSet:
+    id: 1782641351524-8
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: phone
+        constraintName: ukbsce3om1aqn0lw0er0lejgxmd
+        tableName: driver_auth
+- changeSet:
+    id: 1782641351524-9
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: driver_id
+        constraintName: ukmvslk2ftebkmcisi5oaprnjrx
+        tableName: driver_auth
+- changeSet:
+    id: 1782641351524-10
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: idempotency_key
+        constraintName: ukm80md2m59ovfr6v9njdp3fv6e
+        tableName: return_requests
+- changeSet:
+    id: 1782641351524-11
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: idempotency_key
+        constraintName: ukrbfhuvrguc9mbruq52osj3nxm
+        tableName: driver_orders
+- changeSet:
+    id: 1782641351524-12
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: driver_order_items_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: approved_qty
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: product_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: requested_qty
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: order_id
+            type: UUID
+        tableName: driver_order_items
+- changeSet:
+    id: 1782641351524-13
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: drivers_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: car_number
+            type: VARCHAR(50)
+        - column:
+            constraints:
+              nullable: false
+            name: full_name
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: phone
+            type: VARCHAR(20)
+        - column:
+            constraints:
+              nullable: false
+            name: status
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: warehouse_id
+            type: UUID
+        tableName: drivers
+- changeSet:
+    id: 1782641351524-14
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: offline_queue_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: created_offline_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            constraints:
+              nullable: false
+            name: driver_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: operation_type
+            type: VARCHAR(100)
+        - column:
+            name: payload
+            type: JSONB
+        - column:
+            constraints:
+              nullable: false
+            name: retry_count
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: status
+            type: VARCHAR(255)
+        tableName: offline_queue
+- changeSet:
+    id: 1782641351524-15
+    author: bdex0ted
+    changes:
+    - createTable:
+        columns:
+        - column:
+            constraints:
+              nullable: false
+              primaryKey: true
+              primaryKeyName: return_items_pkey
+            name: id
+            type: UUID
+        - column:
+            name: created_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: updated_at
+            type: TIMESTAMP WITHOUT TIME ZONE
+        - column:
+            name: photo_url
+            type: VARCHAR(500)
+        - column:
+            constraints:
+              nullable: false
+            name: product_id
+            type: UUID
+        - column:
+            constraints:
+              nullable: false
+            name: qty_boxes
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: qty_pieces
+            type: INTEGER
+        - column:
+            constraints:
+              nullable: false
+            name: reason
+            type: VARCHAR(255)
+        - column:
+            constraints:
+              nullable: false
+            name: return_id
+            type: UUID
+        tableName: return_items
+- changeSet:
+    id: 1782641351524-16
+    author: bdex0ted
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: order_id
+        baseTableName: driver_order_items
+        constraintName: fk7372j3k5pmqrvf3p5k2ftdoos
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: NO ACTION
+        onUpdate: NO ACTION
+        referencedColumnNames: id
+        referencedTableName: driver_orders
+        validate: true
+- changeSet:
+    id: 1782641351524-17
+    author: bdex0ted
+    changes:
+    - addForeignKeyConstraint:
+        baseColumnNames: return_id
+        baseTableName: return_items
+        constraintName: fkgagrbutf4q1g5wni6ggvsxg16
+        deferrable: false
+        initiallyDeferred: false
+        onDelete: NO ACTION
+        onUpdate: NO ACTION
+        referencedColumnNames: id
+        referencedTableName: return_requests
+        validate: true
+
