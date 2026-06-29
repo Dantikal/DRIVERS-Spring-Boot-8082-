@@ -23,7 +23,7 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/drivers")
 @RequiredArgsConstructor
-@PreAuthorize("permitAll()")
+@PreAuthorize("hasRole('WAREHOUSE_MANAGER')")
 @Tag(name = "Warehouse — Drivers", description = "Управление водителями для завскладом")
 public class DriverAdminController {
 

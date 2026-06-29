@@ -12,11 +12,13 @@ import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
 import java.util.UUID;
 
 @Component
@@ -25,7 +27,6 @@ import java.util.UUID;
 public class WebSocketChannelInterceptor implements ChannelInterceptor {
 
     private final JwtUtil jwtUtil;
-    private final CustomUserDetailsService customUserDetailsService;
 
     @Override
     public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -39,23 +40,26 @@ public class WebSocketChannelInterceptor implements ChannelInterceptor {
                 try {
                     String phone = jwtUtil.extractUserName(token);
                     if (phone != null) {
-                        UserDetails userDetails = customUserDetailsService.loadUserByUsername(phone);
-
-                        if (jwtUtil.validateToken(token, userDetails)) {
-                            UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
-                                    userDetails, null, userDetails.getAuthorities()
-                            );
-                            
-                            Claims claims = jwtUtil.extractAllClaims(token);
-                            String driverIdStr = claims.get("driverId", String.class);
-                            if (driverIdStr != null) {
-                                accessor.getSessionAttributes().put("driverId", UUID.fromString(driverIdStr));
-                            }
-                            
-                            SecurityContextHolder.getContext().setAuthentication(authentication);
-                            accessor.setUser(authentication);
-                            log.info("WebSocket connection authenticated for user {}", phone);
+                        List<String> rolesStr = jwtUtil.extractRoles(token);
+                        List<GrantedAuthority> authorities = new java.util.ArrayList<>();
+                        for (String role : rolesStr) {
+                            String authority = role.startsWith("ROLE_") ? role : "ROLE_" + role;
+                            authorities.add(new SimpleGrantedAuthority(authority));
                         }
+
+                        UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
+                                phone, null, authorities
+                        );
+                        
+                        Claims claims = jwtUtil.extractAllClaims(token);
+                        String driverIdStr = claims.get("driverId", String.class);
+                        if (driverIdStr != null) {
+                            accessor.getSessionAttributes().put("driverId", UUID.fromString(driverIdStr));
+                        }
+                        
+                        SecurityContextHolder.getContext().setAuthentication(authentication);
+                        accessor.setUser(authentication);
+                        log.info("WebSocket connection authenticated for user {}", phone);
                     }
                 } catch (Exception e) {
                     log.error("WebSocket JWT Authentication failed: {}", e.getMessage());

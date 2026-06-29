@@ -72,6 +72,13 @@ public class JwtUtil {
         return extractClaim(token, Claims::getSubject);
     }
 
+    public List<String> extractRoles(String token) {
+        Claims claims = extractAllClaims(token);
+        List<?> roles = claims.get("roles", List.class);
+        if (roles == null) return new ArrayList<>();
+        return roles.stream().map(Object::toString).collect(Collectors.toList());
+    }
+
     private <T> T extractClaim(String token, Function<Claims, T> claimResolver) {
         final Claims claims = extractAllClaims(token);
         return claimResolver.apply(claims);
