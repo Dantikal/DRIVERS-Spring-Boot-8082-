@@ -162,7 +162,7 @@ public class DriverServiceTest {
                 .warehouseId(warehouseId)
                 .build();
         when(driverRepository.saveAndFlush(any(Driver.class)))
-                .thenThrow(new DataIntegrityViolationException("unique constraint on phone"));
+                .thenThrow(new DataIntegrityViolationException("uk_drivers_phone"));
 
         assertThrows(PhoneAlreadyExistsException.class, () -> driverService.createDriver(req));
         verify(driverRepository, times(1)).saveAndFlush(any(Driver.class));
@@ -178,7 +178,7 @@ public class DriverServiceTest {
                 .warehouseId(warehouseId)
                 .build();
         when(driverRepository.saveAndFlush(any(Driver.class)))
-                .thenThrow(new DataIntegrityViolationException("unique constraint on car_number"));
+                .thenThrow(new DataIntegrityViolationException("uk_drivers_car_number"));
 
         assertThrows(CarNumberAlreadyExistsException.class, () -> driverService.createDriver(req));
         verify(driverRepository, times(1)).saveAndFlush(any(Driver.class));

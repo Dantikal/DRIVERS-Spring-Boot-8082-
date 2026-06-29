@@ -77,10 +77,10 @@ public class DriverServiceImpl implements DriverService {
 
         } catch (DataIntegrityViolationException e) {
             String msg = e.getMessage() != null ? e.getMessage().toLowerCase() : "";
-            if (msg.contains("phone")) {
+            if (msg.contains("ukbsce3om1aqn0lw0er0lejgxmd") || msg.contains("uk_drivers_phone")) {
                 throw new PhoneAlreadyExistsException("Номер телефона уже зарегистрирован");
             }
-            if (msg.contains("car_number") || msg.contains("carnumber")) {
+            if (msg.contains("uk_drivers_car_number")) {
                 throw new CarNumberAlreadyExistsException("Номер автомобиля уже зарегистрирован");
             }
             throw e; // re-throw if it's a different constraint

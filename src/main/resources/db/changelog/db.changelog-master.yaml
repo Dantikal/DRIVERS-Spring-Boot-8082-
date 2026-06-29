@@ -475,4 +475,19 @@ databaseChangeLog:
         referencedColumnNames: id
         referencedTableName: return_requests
         validate: true
-
+- changeSet:
+    id: 1782641351524-18
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: car_number
+        constraintName: uk_drivers_car_number
+        tableName: drivers
+- changeSet:
+    id: 1782641351524-19
+    author: bdex0ted
+    changes:
+    - addUniqueConstraint:
+        columnNames: phone
+        constraintName: uk_drivers_phone
+        tableName: drivers
