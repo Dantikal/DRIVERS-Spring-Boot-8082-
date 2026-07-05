@@ -106,6 +106,10 @@ public class DriverAuthServiceImpl implements DriverAuthService {
             throw new InvalidCredentialsException("Недействительный или истёкший токен обновления");
         }
 
+        if (redisTemplate.hasKey("blacklist:" + refreshToken)) {
+            throw new InvalidCredentialsException("Недействительный или истёкший токен обновления");
+        }
+
         DriverAuth driverAuth = driverAuthRepository.findByPhone(phone).orElseThrow(() -> new DriverNotFoundException(
                 "Водитель с номером телефона: " + phone + " не найден"
         ));
