@@ -32,9 +32,10 @@ springdoc:
     path: /v3/api-docs
 
 jwt:
-  secret: ${JWT_SECRET:asdfqwertyyasfasdfkljzxcvmbasjdlfhquktrieorguh}
+  secret: ${JWT_SECRET:getUrOneFromEnvgetUrOneFromEnvgetUrOneFromEnv}
 
 external:
   factory-service:
-    url: ${FACTORY_SERVICE_URL:https://factory-service-ab3j.onrender.com}
+    url: ${FACTORY_SERVICE_URL:http://localhost:8080}
     products-path: ${FACTORY_SERVICE_PRODUCTS_PATH:/api/factory/products}
+    x-api-key: ${FACTORY_SERVICE_X_API_KEY:getUrOneFromEnv}

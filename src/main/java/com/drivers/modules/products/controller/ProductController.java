@@ -23,10 +23,8 @@ public class ProductController {
 
     @GetMapping
     @PreAuthorize("hasRole('DRIVER')")
-    @Operation(summary = "Получить список активных товаров", description = "Делает запрос к factory-service, проксируя токен")
-    public ResponseEntity<Object> getProducts(
-            @RequestHeader(value = HttpHeaders.AUTHORIZATION, required = false) String authorizationHeader) {
-        
-        return productService.getActiveProducts(authorizationHeader);
+    @Operation(summary = "Получить список активных товаров", description = "Делает межсервисный запрос к factory-service с X-API-KEY")
+    public ResponseEntity<Object> getProducts() {
+        return productService.getActiveProducts();
     }
 }

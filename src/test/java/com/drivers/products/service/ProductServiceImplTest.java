@@ -34,15 +34,15 @@ public class ProductServiceImplTest {
     void setUp() {
         ReflectionTestUtils.setField(productService, "factoryServiceUrl", "http://localhost:8080");
         ReflectionTestUtils.setField(productService, "productsPath", "/api/products");
+        ReflectionTestUtils.setField(productService, "apiKey", "f41cac9315b7ae3d0416c03cb3ed270f3835ccc1353481c52aec5110b7c3ca1a");
     }
 
     @Test
     void getActiveProducts_shouldReturnProducts_whenRequestIsSuccessful() {
-        String token = "Bearer some-jwt-token";
         String expectedResponse = "[{\"name\": \"Product A\"}]";
         
         HttpHeaders headers = new HttpHeaders();
-        headers.set(HttpHeaders.AUTHORIZATION, token);
+        headers.set("X-API-KEY", "f41cac9315b7ae3d0416c03cb3ed270f3835ccc1353481c52aec5110b7c3ca1a");
         HttpEntity<Void> expectedEntity = new HttpEntity<>(headers);
 
         when(restTemplate.exchange(
@@ -52,7 +52,7 @@ public class ProductServiceImplTest {
                 eq(Object.class)
         )).thenReturn(ResponseEntity.ok(expectedResponse));
 
-        ResponseEntity<Object> response = productService.getActiveProducts(token);
+        ResponseEntity<Object> response = productService.getActiveProducts();
 
         assertEquals(200, response.getStatusCode().value());
         assertEquals(expectedResponse, response.getBody());
@@ -60,8 +60,6 @@ public class ProductServiceImplTest {
 
     @Test
     void getActiveProducts_shouldThrowException_whenRestTemplateFails() {
-        String token = "Bearer some-jwt-token";
-        
         when(restTemplate.exchange(
                 anyString(),
                 any(HttpMethod.class),
@@ -70,7 +68,7 @@ public class ProductServiceImplTest {
         )).thenThrow(new RuntimeException("Connection refused"));
 
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            productService.getActiveProducts(token);
+            productService.getActiveProducts();
         });
 
         assertEquals("Не удалось получить список товаров из factory-service", exception.getMessage());

@@ -35,30 +35,15 @@ public class ProductControllerTest {
     }
 
     @Test
-    void getProducts_shouldReturnProducts_whenTokenProvided() throws Exception {
-        String token = "Bearer some-jwt-token";
+    void getProducts_shouldReturnProducts() throws Exception {
         String expectedResponse = "[{\"id\": 1, \"name\": \"Product 1\"}]";
         
-        when(productService.getActiveProducts(token)).thenReturn(ResponseEntity.ok(expectedResponse));
-
-        mockMvc.perform(get("/api/drivers/products")
-                .header(HttpHeaders.AUTHORIZATION, token))
-                .andExpect(status().isOk())
-                .andExpect(content().string(expectedResponse));
-
-        verify(productService, times(1)).getActiveProducts(token);
-    }
-    
-    @Test
-    void getProducts_shouldReturnProducts_whenNoTokenProvided() throws Exception {
-        String expectedResponse = "[{\"id\": 1, \"name\": \"Product 1\"}]";
-        
-        when(productService.getActiveProducts(null)).thenReturn(ResponseEntity.ok(expectedResponse));
+        when(productService.getActiveProducts()).thenReturn(ResponseEntity.ok(expectedResponse));
 
         mockMvc.perform(get("/api/drivers/products"))
                 .andExpect(status().isOk())
                 .andExpect(content().string(expectedResponse));
 
-        verify(productService, times(1)).getActiveProducts(null);
+        verify(productService, times(1)).getActiveProducts();
     }
 }

@@ -18,20 +18,22 @@ public class ProductServiceImpl implements ProductService {
 
     private final RestTemplate restTemplate;
 
-    @Value("${external.factory-service.url:http://localhost:8080}")
+    @Value("${external.factory-service.url}")
     private String factoryServiceUrl;
 
-    @Value("${external.factory-service.products-path:/api/products}")
+    @Value("${external.factory-service.products-path}")
     private String productsPath;
 
-    public ResponseEntity<Object> getActiveProducts(String authorizationHeader) {
+    @Value("${external.factory-service.x-api-key}")
+    private String apiKey;
+
+    @Override
+    public ResponseEntity<Object> getActiveProducts() {
         String url = factoryServiceUrl + productsPath;
         log.info("Proxying request to factory-service for products: {}", url);
 
         HttpHeaders headers = new HttpHeaders();
-        if (authorizationHeader != null) {
-            headers.set(HttpHeaders.AUTHORIZATION, authorizationHeader);
-        }
+        headers.set("X-API-KEY", apiKey);
 
         HttpEntity<Void> requestEntity = new HttpEntity<>(headers);
         log.info(requestEntity.getHeaders().toString());
@@ -46,7 +48,6 @@ public class ProductServiceImpl implements ProductService {
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.warn("Factory service returned error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
             return ResponseEntity.status(e.getStatusCode())
-                    .headers(e.getResponseHeaders())
                     .body(e.getResponseBodyAsString());
         } catch (Exception e) {
             log.error("Error while fetching products from factory-service", e);
