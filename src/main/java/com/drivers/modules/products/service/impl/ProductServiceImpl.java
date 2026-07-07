@@ -39,12 +39,14 @@ public class ProductServiceImpl implements ProductService {
         log.info(requestEntity.getHeaders().toString());
 
         try {
-            return restTemplate.exchange(
+            ResponseEntity<Object> response = restTemplate.exchange(
                     url,
                     HttpMethod.GET,
                     requestEntity,
                     Object.class
             );
+            return ResponseEntity.status(response.getStatusCode())
+                    .body(response.getBody());
         } catch (org.springframework.web.client.HttpStatusCodeException e) {
             log.warn("Factory service returned error {}: {}", e.getStatusCode(), e.getResponseBodyAsString());
             return ResponseEntity.status(e.getStatusCode())
