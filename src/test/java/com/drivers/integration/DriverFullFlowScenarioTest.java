@@ -115,6 +115,28 @@ public class DriverFullFlowScenarioTest {
         ResponseEntity<String> ordersListRes = restTemplate.exchange("/api/drivers/me/orders?status=NEW", HttpMethod.GET, profileReq, String.class);
         assertEquals(HttpStatus.OK, ordersListRes.getStatusCode());
 
+        // Modify order step
+        UUID targetOrderId = UUID.randomUUID();
+        OrderDto modifiedOrder = new OrderDto(
+                targetOrderId, driverId, null,
+                OrderStatus.MODIFIED,
+                null, null, null, null, null, null
+        );
+        when(orderService.modifyMyOrder(any(), any(), any())).thenReturn(modifiedOrder);
+
+        com.drivers.modules.orders.dto.req.OrderModifyReq modifyReq = com.drivers.modules.orders.dto.req.OrderModifyReq.builder()
+                .totalAmount(new BigDecimal("2000.00"))
+                .items(List.of(
+                        new com.drivers.modules.orders.dto.req.OrderItemReq(UUID.randomUUID(), 15, null)
+                ))
+                .build();
+
+        HttpEntity<String> modifyHttpReq = new HttpEntity<>(objectMapper.writeValueAsString(modifyReq), authHeaders);
+        ResponseEntity<OrderDto> modifyRes = restTemplate.exchange("/api/drivers/me/orders/" + targetOrderId, HttpMethod.PUT, modifyHttpReq, OrderDto.class);
+
+        assertEquals(HttpStatus.OK, modifyRes.getStatusCode());
+        assertEquals(OrderStatus.MODIFIED, modifyRes.getBody().status());
+
         ReturnCreateReq returnReq = new ReturnCreateReq(
                 driverId,
                 new BigDecimal("200.00"),

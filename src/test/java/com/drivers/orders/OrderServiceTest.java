@@ -454,4 +454,87 @@ public class OrderServiceTest {
         verify(idempotencyHelper, times(1)).saveOrder(any(DriverOrder.class));
         verify(orderRepo, times(2)).findByIdempotencyKey(idempotencyKey);
     }
+    @Test
+    void modifyMyOrder_Success() {
+        UUID orderId = UUID.randomUUID();
+        UUID driverId = UUID.randomUUID();
+        UUID productId = UUID.randomUUID();
+
+        DriverOrder order = DriverOrder.builder()
+                .driverId(driverId)
+                .status(OrderStatus.NEW)
+                .items(new ArrayList<>())
+                .build();
+        order.id = orderId;
+
+        DriverOrderItem item = DriverOrderItem.builder()
+                .productId(productId)
+                .requestedQty(5)
+                .order(order)
+                .build();
+        item.id = UUID.randomUUID();
+        order.getItems().add(item);
+
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+        when(orderRepo.save(any(DriverOrder.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        OrderModifyReq req = OrderModifyReq.builder()
+                .totalAmount(BigDecimal.valueOf(2000.0))
+                .comment("Updated comment")
+                .items(List.of(
+                        OrderItemReq.builder()
+                                .productId(productId)
+                                .requestedQty(10) // Updated qty
+                                .build(),
+                        OrderItemReq.builder()
+                                .productId(UUID.randomUUID())
+                                .requestedQty(2) // New item
+                                .build()
+                ))
+                .build();
+
+        OrderDto result = orderService.modifyMyOrder(orderId, driverId, req);
+
+        assertEquals(OrderStatus.MODIFIED, result.status());
+        assertEquals(BigDecimal.valueOf(2000.0), result.totalAmount());
+        assertEquals("Updated comment", result.comment());
+        assertEquals(2, result.items().size());
+        
+        verify(orderRepo).save(order);
+        verify(eventPublisher).publishOrderUpdated(any(DriverOrderEvent.class));
+    }
+
+    @Test
+    void modifyMyOrder_WrongDriver_ThrowsException() {
+        UUID orderId = UUID.randomUUID();
+        UUID driverId = UUID.randomUUID();
+
+        DriverOrder order = DriverOrder.builder()
+                .driverId(UUID.randomUUID()) // Different driver
+                .status(OrderStatus.NEW)
+                .build();
+
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+
+        OrderModifyReq req = OrderModifyReq.builder().build();
+
+        assertThrows(AccessDeniedException.class, () -> orderService.modifyMyOrder(orderId, driverId, req));
+    }
+
+    @Test
+    void modifyMyOrder_WrongStatus_ThrowsException() {
+        UUID orderId = UUID.randomUUID();
+        UUID driverId = UUID.randomUUID();
+
+        DriverOrder order = DriverOrder.builder()
+                .driverId(driverId)
+                .status(OrderStatus.CONFIRMED)
+                .build();
+
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+
+        OrderModifyReq req = OrderModifyReq.builder().build();
+
+        assertThrows(IllegalStateException.class, () -> orderService.modifyMyOrder(orderId, driverId, req));
+    }
 }

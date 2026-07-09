@@ -20,4 +20,5 @@ public interface OrderService {
     OrderDto modifyOrder(UUID id, OrderModifyReq req);
     OrderDto rejectOrder(UUID id, OrderRejectReq req);
     OrderDto markDispatched(UUID id);
+    OrderDto modifyMyOrder(UUID id, UUID driverId, OrderModifyReq req);
 }

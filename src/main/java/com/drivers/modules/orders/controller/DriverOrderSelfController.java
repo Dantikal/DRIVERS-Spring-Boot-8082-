@@ -61,4 +61,12 @@ public class DriverOrderSelfController {
     public OrderDto getMyOrder(@PathVariable UUID id, @CurrentDriverId UUID driverId) {
         return orderService.getOrder(id, driverId);
     }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Изменить свою заявку (доступно только в статусе NEW)")
+    public OrderDto modifyMyOrder(@PathVariable UUID id, 
+                                  @Valid @RequestBody com.drivers.modules.orders.dto.req.OrderModifyReq req, 
+                                  @CurrentDriverId UUID driverId) {
+        return orderService.modifyMyOrder(id, driverId, req);
+    }
 }

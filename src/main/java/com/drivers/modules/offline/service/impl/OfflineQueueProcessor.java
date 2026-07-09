@@ -15,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -67,6 +68,11 @@ public class OfflineQueueProcessor {
             case "CREATE_ORDER" -> {
                 OrderCreateReq orderReq = objectMapper.convertValue(task.getPayload(), OrderCreateReq.class);
                 orderService.createOrder(orderReq, task.getDriverId(), idempotencyKey);
+            }
+            case "MODIFY_ORDER" -> {
+                UUID orderId = UUID.fromString(task.getPayload().get("orderId").toString());
+                com.drivers.modules.orders.dto.req.OrderModifyReq modifyReq = objectMapper.convertValue(task.getPayload(), com.drivers.modules.orders.dto.req.OrderModifyReq.class);
+                orderService.modifyMyOrder(orderId, task.getDriverId(), modifyReq);
             }
             case "CREATE_RETURN" -> {
                 ReturnCreateReq returnReq = objectMapper.convertValue(task.getPayload(), ReturnCreateReq.class);

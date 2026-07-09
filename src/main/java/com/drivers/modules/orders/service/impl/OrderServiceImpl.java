@@ -166,6 +166,53 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public OrderDto modifyMyOrder(UUID id, UUID driverId, OrderModifyReq req) {
+        DriverOrder order = getOrderById(id);
+
+        if (!order.getDriverId().equals(driverId)) {
+            throw new AccessDeniedException("Вы не имеете доступа к данному заказу");
+        }
+
+        if (order.getStatus() != OrderStatus.NEW) {
+            throw new IllegalStateException("Водитель может редактировать заявку только в статусе NEW");
+        }
+
+        order.setStatus(OrderStatus.MODIFIED);
+        order.setComment(req.comment());
+        order.setTotalAmount(req.totalAmount());
+        
+        Set<UUID> newProductIds = req.items().stream()
+                .map(OrderItemReq::productId)
+                .collect(Collectors.toSet());
+
+        order.getItems().removeIf(item -> !newProductIds.contains(item.getProductId()));
+
+        for (OrderItemReq itemReq : req.items()) {
+            DriverOrderItem existingItem = order.getItems().stream()
+                    .filter(item -> item.getProductId().equals(itemReq.productId()))
+                    .findFirst()
+                    .orElse(null);
+
+            if (existingItem != null) {
+                existingItem.setRequestedQty(itemReq.requestedQty());
+            } else {
+                DriverOrderItem newItem = DriverOrderItem.builder()
+                        .order(order)
+                        .productId(itemReq.productId())
+                        .requestedQty(itemReq.requestedQty())
+                        .build();
+                order.getItems().add(newItem);
+            }
+        }
+
+        DriverOrder saved = orderRepo.save(order);
+        publishOrderEvent(saved, "ORDER_UPDATED", TOPIC_ORDERS_UPDATED);
+        log.info("The order {} was modified by driver", id);
+        return toDto(saved);
+    }
+
+    @Override
+    @Transactional
     public OrderDto rejectOrder(UUID id, OrderRejectReq req) {
         DriverOrder order = getOrderById(id);
 
