@@ -213,6 +213,24 @@ public class OrderServiceImpl implements OrderService {
 
     @Override
     @Transactional
+    public void deleteMyOrder(UUID id, UUID driverId) {
+        DriverOrder order = getOrderById(id);
+
+        if (!order.getDriverId().equals(driverId)) {
+            throw new AccessDeniedException("Вы не имеете доступа к данному заказу");
+        }
+
+        if (order.getStatus() != OrderStatus.NEW) {
+            throw new IllegalStateException("Удалить можно только заявку в статусе NEW");
+        }
+
+        orderRepo.delete(order);
+        publishOrderEvent(order, "ORDER_DELETED", TOPIC_ORDERS_UPDATED);
+        log.info("Order {} was deleted by driver", id);
+    }
+
+    @Override
+    @Transactional
     public OrderDto rejectOrder(UUID id, OrderRejectReq req) {
         DriverOrder order = getOrderById(id);
 

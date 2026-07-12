@@ -78,6 +78,10 @@ public class OfflineQueueProcessor {
                 ReturnCreateReq returnReq = objectMapper.convertValue(task.getPayload(), ReturnCreateReq.class);
                 returnService.createReturn(returnReq, task.getDriverId(), idempotencyKey);
             }
+            case "DELETE_ORDER" -> {
+                UUID orderId = UUID.fromString(task.getPayload().get("orderId").toString());
+                orderService.deleteMyOrder(orderId, task.getDriverId());
+            }
             default -> throw new IllegalArgumentException("Unsupported operation type: " + task.getOperationType());
         }
     }

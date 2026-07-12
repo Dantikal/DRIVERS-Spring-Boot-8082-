@@ -69,4 +69,11 @@ public class DriverOrderSelfController {
                                   @CurrentDriverId UUID driverId) {
         return orderService.modifyMyOrder(id, driverId, req);
     }
+
+    @DeleteMapping("/{id}")
+    @Operation(summary = "Удалить свою заявку (доступно только в статусе NEW)")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    public void deleteMyOrder(@PathVariable UUID id, @CurrentDriverId UUID driverId) {
+        orderService.deleteMyOrder(id, driverId);
+    }
 }

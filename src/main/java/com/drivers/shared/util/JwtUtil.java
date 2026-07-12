@@ -27,7 +27,8 @@ public class JwtUtil {
             @Value("${jwt.expiration-time}") long jwtExpirationTime,
             @Value("${jwt.refresh-expiration-time}") long jwtRefreshExpirationTime) {
 
-        byte[] keyBytes = Decoders.BASE64.decode(secret);
+        // Using UTF-8 bytes instead of Base64 to be compatible with Django/Node.js which use raw string bytes
+        byte[] keyBytes = secret.getBytes(java.nio.charset.StandardCharsets.UTF_8);
         this.secretKey = Keys.hmacShaKeyFor(keyBytes);
         this.jwtExpirationTime = jwtExpirationTime;
         this.jwtRefreshExpirationTime = jwtRefreshExpirationTime;

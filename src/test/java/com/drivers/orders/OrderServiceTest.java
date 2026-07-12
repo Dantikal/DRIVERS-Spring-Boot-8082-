@@ -537,4 +537,53 @@ public class OrderServiceTest {
 
         assertThrows(IllegalStateException.class, () -> orderService.modifyMyOrder(orderId, driverId, req));
     }
+
+    @Test
+    void deleteMyOrder_Success() {
+        UUID orderId = UUID.randomUUID();
+        UUID driverId = UUID.randomUUID();
+
+        DriverOrder order = DriverOrder.builder()
+                .driverId(driverId)
+                .status(OrderStatus.NEW)
+                .build();
+        order.id = orderId;
+
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+
+        orderService.deleteMyOrder(orderId, driverId);
+
+        verify(orderRepo).delete(order);
+        verify(eventPublisher).publishOrderUpdated(any(DriverOrderEvent.class));
+    }
+
+    @Test
+    void deleteMyOrder_WrongDriver_ThrowsException() {
+        UUID orderId = UUID.randomUUID();
+        UUID driverId = UUID.randomUUID();
+
+        DriverOrder order = DriverOrder.builder()
+                .driverId(UUID.randomUUID()) // Different driver
+                .status(OrderStatus.NEW)
+                .build();
+
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThrows(AccessDeniedException.class, () -> orderService.deleteMyOrder(orderId, driverId));
+    }
+
+    @Test
+    void deleteMyOrder_WrongStatus_ThrowsException() {
+        UUID orderId = UUID.randomUUID();
+        UUID driverId = UUID.randomUUID();
+
+        DriverOrder order = DriverOrder.builder()
+                .driverId(driverId)
+                .status(OrderStatus.CONFIRMED)
+                .build();
+
+        when(orderRepo.findById(orderId)).thenReturn(Optional.of(order));
+
+        assertThrows(IllegalStateException.class, () -> orderService.deleteMyOrder(orderId, driverId));
+    }
 }
